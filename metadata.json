@@ -1,0 +1,6 @@
+{
+  "name": "VeriThread",
+  "description": "Digital Product Passport platform for fashion brands, empowering creators to generate permanent digital identities, QR codes, and provenance certificates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
