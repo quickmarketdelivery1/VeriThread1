@@ -1233,18 +1233,19 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
             {currentStep === 5 ? (
               <>
                 <button
-                  onClick={() => handlePublish(false)}
-                  className="px-3.5 py-2 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap active:scale-95 duration-150"
-                >
-                  Save Draft
-                </button>
+  type="button"
+  onClick={() => handlePublish(false)}
+  className="px-3.5 py-2 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-colors flex items-center justify-center whitespace-nowrap active:bg-gray-100"
+>
+  Save Draft
+</button>
                 <button
-                  onClick={() => handlePublish(true)}
-                  onTouchEnd={() => handlePublish(true)}
-                  className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 duration-150 whitespace-nowrap"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
-                </button>
+  type="button"
+  onClick={() => handlePublish(true)}
+  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0b3d26] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-colors hover:opacity-90 whitespace-nowrap"
+>
+  <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
+</button>
               </>
             ) : (
               <button
