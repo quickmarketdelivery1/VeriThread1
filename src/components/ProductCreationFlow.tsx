@@ -1240,6 +1240,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
                 </button>
                 <button
                   onClick={() => handlePublish(true)}
+                  onTouchEnd={() => handlePublish(true)}
                   className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 duration-150 whitespace-nowrap"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
