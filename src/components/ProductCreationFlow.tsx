@@ -1409,3 +1409,4 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     </div>
   );
 }
+ 
