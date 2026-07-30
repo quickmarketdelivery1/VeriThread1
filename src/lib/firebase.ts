@@ -428,19 +428,30 @@ export async function syncBrandInFirestore(
   return newBrand;
 }
 
+function sanitizeForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj, (_key, value) => {
+    return value === undefined ? null : value;
+  }));
+}
+
 export async function saveBrandFirestore(brand: Brand): Promise<void> {
   try {
-    await setDoc(doc(db, 'brands', brand.id), brand, { merge: true });
+    const cleanBrand = sanitizeForFirestore(brand);
+    await setDoc(doc(db, 'brands', brand.id), cleanBrand, { merge: true });
   } catch (e) {
     console.warn('Firestore saveBrand error:', e);
   }
 }
 
 export async function saveProductFirestore(product: Product): Promise<void> {
+  console.log('[Firestore] saveProductFirestore called for product ID:', product.id);
   try {
-    await setDoc(doc(db, 'products', product.id), product, { merge: true });
-  } catch (e) {
-    console.warn('Firestore saveProduct error:', e);
+    const cleanProduct = sanitizeForFirestore(product);
+    await setDoc(doc(db, 'products', product.id), cleanProduct, { merge: true });
+    console.log('[Firestore] saveProductFirestore successfully written to Firestore for product ID:', product.id);
+  } catch (e: any) {
+    console.warn('[Firestore] saveProductFirestore error:', e?.message || e);
   }
 }
 
@@ -453,12 +464,15 @@ export async function deleteProductFirestore(productId: string): Promise<void> {
 }
 
 export async function fetchProductsFirestore(brandId: string): Promise<Product[]> {
+  console.log('[Firestore] fetchProductsFirestore called for brandId:', brandId);
   try {
     const q = query(collection(db, 'products'), where('brandId', '==', brandId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => d.data() as Product);
-  } catch (e) {
-    console.warn('Firestore fetchProducts warning:', e);
+    const products = snap.docs.map(d => d.data() as Product);
+    console.log('[Firestore] fetchProductsFirestore returned', products.length, 'products from Firestore');
+    return products;
+  } catch (e: any) {
+    console.warn('[Firestore] fetchProductsFirestore error:', e?.message || e);
     return [];
   }
 }

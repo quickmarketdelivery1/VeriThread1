@@ -112,9 +112,20 @@ export default function App() {
           fetchAnalyticsEventsFirestore(userBrand.id)
         ]);
 
+        // Preserve locally created items if Firestore returns empty array to prevent data loss on refresh
+        let currentLocalProducts: any[] = [];
+        try {
+          const lp = localStorage.getItem('vt_products');
+          if (lp) currentLocalProducts = JSON.parse(lp);
+        } catch (e) {}
+
+        const finalProducts = fsProducts.length > 0 
+          ? fsProducts 
+          : (currentLocalProducts.length > 0 ? currentLocalProducts : []);
+
         // Save real user data in localStorage session
         localStorage.setItem('vt_brand', JSON.stringify(userBrand));
-        localStorage.setItem('vt_products', JSON.stringify(fsProducts));
+        localStorage.setItem('vt_products', JSON.stringify(finalProducts));
         localStorage.setItem('vt_collections', JSON.stringify(fsCollections));
         localStorage.setItem('vt_qrcodes', JSON.stringify(fsQRCodes));
         localStorage.setItem('vt_customers', JSON.stringify(fsCustomers));

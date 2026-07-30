@@ -306,7 +306,9 @@ export function getProducts(): Product[] {
     try {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) return parsed;
-    } catch {}
+    } catch (e) {
+      console.error('[Storage] Error parsing vt_products:', e);
+    }
   }
   return isUserRegisteredSession() ? [] : sampleProducts;
 }
@@ -316,25 +318,43 @@ export function getProductById(id: string): Product | undefined {
   return products.find(p => p.id === id);
 }
 
-export function saveProduct(product: Product) {
+export function saveProduct(product: Product): Product[] {
+  console.log('[Storage] saveProduct called for product:', product.name, 'ID:', product.id);
   if (isPreviewModeReadOnly()) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return getProducts();
   }
   const brand = getBrand();
-  const productWithBrand = { ...product, brandId: product.brandId || brand.id };
+  const productWithBrand: Product = { 
+    ...product, 
+    brandId: product.brandId || brand.id || 'brand-1',
+    updatedAt: new Date().toISOString()
+  };
   const list = getProducts();
   const index = list.findIndex(p => p.id === productWithBrand.id);
   if (index >= 0) {
     list[index] = productWithBrand;
   } else {
-    list.push(productWithBrand);
+    list.unshift(productWithBrand);
   }
-  localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(list));
-  saveProductFirestore(productWithBrand).catch(err => console.warn('Firestore sync product warning:', err));
+  try {
+    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(list));
+    console.log('[Storage] Product successfully saved to localStorage. Total products:', list.length);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (e) {
+    console.error('[Storage] Error writing product to localStorage:', e);
+  }
+
+  saveProductFirestore(productWithBrand).catch(err => console.warn('[Storage] Firestore sync product warning:', err));
 
   // Also ensure a QR Code exists for this product
-  getOrCreateQRCode(productWithBrand.id);
+  try {
+    getOrCreateQRCode(productWithBrand.id);
+  } catch (e) {
+    console.warn('[Storage] Error creating QR code:', e);
+  }
   
   return list;
 }

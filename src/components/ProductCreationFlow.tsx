@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowLeft, ArrowRight, ShieldCheck, QrCode, Upload, Eye, CheckCircle2, ChevronRight, HelpCircle, X, CreditCard, RefreshCw } from 'lucide-react';
 import { Product, Collection } from '../types';
 import { getCollections, saveProduct, getProducts, getBrand, saveBrand, incrementQRCount, incrementAICount, isValidCoupon } from '../lib/storage';
+import { saveProductFirestore } from '../lib/firebase';
 import { generateProductStory, generateCareInstructions, generateProductTags, getPremiumHelp } from '../lib/ai';
 
 interface ProductCreationFlowProps {
@@ -272,41 +273,68 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     }
   };
 
+  // Validation functions
   const validateStep = (step: number) => {
-  const errs: Record<string, string> = {};
+    const errs: Record<string, string> = {};
 
-  if (step === 1) {
-    // ✅ Check if name exists and has content
-    if (!name || name.trim() === '') {
-      errs.name = 'Product name is required';
+    if (step === 1) {
+      if (!name.trim()) errs.name = 'Product name is required';
+      if (!sku.trim()) errs.sku = 'SKU is required';
+    } else if (step === 2) {
+      if (!fabric.trim()) errs.fabric = 'Fabric composition details are required';
+      if (!color.trim()) errs.color = 'Color is required';
+    } else if (step === 3) {
+      const currentHero = heroImage.trim() || galleryImages.find(img => img && img.trim());
+      if (!currentHero) errs.heroImage = 'A high-resolution hero image URL is required';
+    } else if (step === 4) {
+      if (buyNowType === 'whatsapp' && !buyNowValue.trim()) {
+        errs.buyNowValue = 'WhatsApp contact phone is required';
+      } else if (buyNowType === 'instagram' && !buyNowValue.trim()) {
+        errs.buyNowValue = 'Instagram handle/profile is required';
+      } else if (buyNowType === 'custom' && !buyNowValue.trim()) {
+        errs.buyNowValue = 'Destination URL or coordinate value is required';
+      }
     }
-    if (!sku || sku.trim() === '') {
-      errs.sku = 'SKU is required';
-    }
-  } else if (step === 2) {
-    if (!fabric || fabric.trim() === '') {
-      errs.fabric = 'Fabric composition details are required';
-    }
-    if (!color || color.trim() === '') {
-      errs.color = 'Color is required';
-    }
-  } else if (step === 3) {
-    if (!heroImage || heroImage.trim() === '') {
-      errs.heroImage = 'A high-resolution hero image URL is required';
-    }
-  } else if (step === 4) {
-    if (buyNowType === 'whatsapp' && (!buyNowValue || buyNowValue.trim() === '')) {
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const validateAllSteps = (): boolean => {
+    const errs: Record<string, string> = {};
+
+    if (!name.trim()) errs.name = 'Product name is required';
+    if (!sku.trim()) errs.sku = 'SKU is required';
+    if (!fabric.trim()) errs.fabric = 'Fabric composition details are required';
+    if (!color.trim()) errs.color = 'Color is required';
+
+    if (buyNowType === 'whatsapp' && !buyNowValue.trim()) {
       errs.buyNowValue = 'WhatsApp contact phone is required';
-    } else if (buyNowType === 'instagram' && (!buyNowValue || buyNowValue.trim() === '')) {
+    } else if (buyNowType === 'instagram' && !buyNowValue.trim()) {
       errs.buyNowValue = 'Instagram handle/profile is required';
-    } else if (buyNowType === 'custom' && (!buyNowValue || buyNowValue.trim() === '')) {
+    } else if (buyNowType === 'custom' && !buyNowValue.trim()) {
       errs.buyNowValue = 'Destination URL or coordinate value is required';
     }
-  }
 
-  setErrors(errs);
-  return Object.keys(errs).length === 0;
-};
+    if (errs.name || errs.sku) {
+      setErrors(errs);
+      setCurrentStep(1);
+      return false;
+    }
+    if (errs.fabric || errs.color) {
+      setErrors(errs);
+      setCurrentStep(2);
+      return false;
+    }
+    if (errs.buyNowValue) {
+      setErrors(errs);
+      setCurrentStep(4);
+      return false;
+    }
+
+    setErrors({});
+    return true;
+  };
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
@@ -318,11 +346,19 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     setCurrentStep(currentStep - 1);
   };
 
-  const handlePublish = (isPublishing: boolean) => {
+  const handlePublish = async (isPublishing: boolean) => {
+    console.log('[ProductCreationFlow] handlePublish initiated. isPublishing:', isPublishing);
+
+    if (!validateAllSteps()) {
+      console.warn('[ProductCreationFlow] Validation failed in handlePublish');
+      return;
+    }
+
     try {
       // 1. Strict limit check on active publication
       const qrResult = incrementQRCount();
       if (!qrResult.allowed) {
+        console.warn('[ProductCreationFlow] Monthly QR limit reached:', qrResult.message);
         const freshBrand = getBrand();
         setUpgradeModalConfig({
           featureName: "Digital Passport QR Codes",
@@ -338,34 +374,35 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
       }
 
       const safeName = (name || 'Bespoke Garment').trim();
-      const uniqueId = `prod-${safeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(10 + Math.random() * 90)}`;
+      const uniqueId = `prod-${safeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const safeHeroImage = heroImage.trim() || galleryImages.find(img => img && img.trim()) || 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800';
 
       const newProduct: Product = {
         id: uniqueId,
         brandId: brand.id || 'brand-1',
-        collectionId: collectionId || undefined,
+        collectionId: collectionId.trim() || undefined,
         name: safeName,
-        sku: sku || `AA-TRD-${Math.floor(100 + Math.random() * 900)}`,
+        sku: sku.trim() || `AA-TRD-${Math.floor(100 + Math.random() * 900)}`,
         category: category || 'Traditional Wear',
         description: `Premium bespoke tailored ${safeName}. Sourced and handcrafted in Nigeria.`,
-        priceMin: priceMin !== '' ? priceMin : undefined,
-        priceMax: priceMax !== '' ? priceMax : undefined,
-        fabric: fabric || 'Premium Fabric',
+        priceMin: priceMin !== '' ? Number(priceMin) : undefined,
+        priceMax: priceMax !== '' ? Number(priceMax) : undefined,
+        fabric: fabric.trim() || 'Premium Fabric',
         material: material || 'Cotton',
         gsm: gsm || 'Medium 150-200',
-        color: color || 'Bespoke',
+        color: color.trim() || 'Bespoke',
         fit: fit || 'Regular',
         careInstructions: finalCare,
-        sizeGuide: sizeGuide || undefined,
-        story: story || undefined,
-        founderMessage: founderMessage || undefined,
+        sizeGuide: sizeGuide.trim() || undefined,
+        story: story.trim() || undefined,
+        founderMessage: founderMessage.trim() || undefined,
         founderPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150&h=150',
-        collectionStory: collectionStory || undefined,
-        heroImage: heroImage || 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800',
+        collectionStory: collectionStory.trim() || undefined,
+        heroImage: safeHeroImage,
         galleryImages: galleryImages.filter(img => img && img.trim() !== ''),
-        videoUrl: videoUrl || undefined,
+        videoUrl: videoUrl.trim() || undefined,
         buyNowType: buyNowType || 'whatsapp',
-        buyNowValue: buyNowValue || '+234 812 345 6789',
+        buyNowValue: buyNowValue.trim() || '+234 812 345 6789',
         warrantyPeriod: warrantyPeriod || 12,
         isActive: true,
         isPublished: isPublishing,
@@ -373,14 +410,22 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         updatedAt: new Date().toISOString()
       };
 
+      console.log('[ProductCreationFlow] Saving product to localStorage:', newProduct);
       saveProduct(newProduct);
+
+      console.log('[ProductCreationFlow] Syncing product to Firestore:', newProduct.id);
+      await saveProductFirestore(newProduct);
+
+      console.log('[ProductCreationFlow] Product certified & saved successfully:', uniqueId);
       setCreatedProductId(uniqueId);
       setIsSuccess(true);
       onRefresh();
-      // Reset scroll position to top so the user immediately sees the success screen on mobile
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      console.error("Error publishing product:", err);
+      
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (err: any) {
+      console.error("[ProductCreationFlow] Error publishing product:", err);
       alert("Could not certify product passport. Please check required fields and try again.");
     }
   };

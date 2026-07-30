@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Grid, List, QrCode, Globe, Eye, Trash2, ArrowUpRight, Heart } from 'lucide-react';
 import { Product } from '../types';
 import { getProducts, getQRCodes, getOwnerships, deleteProduct, getBrand } from '../lib/storage';
@@ -11,9 +11,21 @@ interface ProductsListPageProps {
 
 export default function ProductsListPage({ onNavigate, onRefresh }: ProductsListPageProps) {
   const brand = getBrand();
-  const products = getProducts();
+  const [products, setProducts] = useState<Product[]>(() => getProducts());
   const qrcodes = getQRCodes();
   const ownerships = getOwnerships();
+
+  useEffect(() => {
+    setProducts(getProducts());
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setProducts(getProducts());
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -24,6 +36,7 @@ export default function ProductsListPage({ onNavigate, onRefresh }: ProductsList
   const handleDelete = (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
       deleteProduct(id);
+      setProducts(getProducts());
       onRefresh();
     }
   };
