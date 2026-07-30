@@ -1217,48 +1217,54 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         )}
 
         {/* Navigation Buttons Row */}
-        <div className="flex flex-row items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-2 w-full">
-          {currentStep > 1 ? (
-            <button
-              onClick={handleBack}
-              className="px-3.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100/60 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
-            </button>
-          ) : (
-            <div className="w-1" /> // Spacer
-          )}
+<div className="flex flex-row items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-2 w-full">
+  {currentStep > 1 ? (
+    <button
+      type="button"
+      onClick={handleBack}
+      className="px-3.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100/60 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1"
+    >
+      <ArrowLeft className="w-3.5 h-3.5" /> Back
+    </button>
+  ) : (
+    <div className="w-1" /> // Spacer
+  )}
 
-          <div className="flex flex-row items-center gap-2 sm:gap-3">
-            {currentStep === 5 ? (
-              <>
-                <button
-  type="button"
-  onClick={() => handlePublish(false)}
-  className="px-3.5 py-2 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-colors flex items-center justify-center whitespace-nowrap active:bg-gray-100"
->
-  Save Draft
-</button>
-                <button
-  type="button"
-  onClick={() => handlePublish(true)}
-  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0b3d26] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-colors hover:opacity-90 whitespace-nowrap"
->
-  <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
-</button>
-              </>
-            ) : (
-              <button
-                onClick={handleNext}
-                className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 duration-150 whitespace-nowrap"
-              >
-                Next Step <ArrowRight className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        </div>
-
-      </div>
+  <div className="flex flex-row items-center gap-2 sm:gap-3">
+    {currentStep === 5 ? (
+      <>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            handlePublish(false);
+          }}
+          className="px-3.5 py-2 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-colors flex items-center justify-center whitespace-nowrap active:bg-gray-100"
+        >
+          Save Draft
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            handlePublish(true);
+          }}
+          className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0b3d26] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-colors hover:opacity-90 whitespace-nowrap"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
+        </button>
+      </>
+    ) : (
+      <button
+        type="button"
+        onClick={handleNext}
+        className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 active:scale-95 duration-150 whitespace-nowrap"
+      >
+        Next Step <ArrowRight className="w-3 h-3" />
+      </button>
+    )}
+  </div>
+</div>
 
       {/* Upgrade Modal overlay */}
       {showUpgradeModal && (
