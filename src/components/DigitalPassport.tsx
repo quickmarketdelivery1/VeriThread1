@@ -280,11 +280,17 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           {/* Product Logo / Brand info overlaid elegantly */}
           <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <img 
-                src={brand.logoUrl || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150"} 
-                className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg" 
-                alt="" 
-              />
+              {brand.logoUrl ? (
+                <img 
+                  src={brand.logoUrl} 
+                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg" 
+                  alt="" 
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-emerald-900 border-2 border-white shadow-lg flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
+                  {brand.name ? brand.name.charAt(0).toUpperCase() : 'V'}
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">{brand.name}</span>

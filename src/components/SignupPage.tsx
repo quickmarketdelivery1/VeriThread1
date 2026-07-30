@@ -6,7 +6,16 @@ import { PaystackCheckoutModal } from './PaystackCheckoutModal';
 
 interface SignupPageProps {
   onNavigate: (route: string) => void;
-  onSignupSuccess?: (name: string, email: string, plan: any) => void;
+  onSignupSuccess?: (
+    name: string,
+    email: string,
+    plan: any,
+    userHasDevAccess?: boolean,
+    brandName?: string,
+    brandType?: string,
+    brandDescription?: string,
+    brandLocation?: string
+  ) => void;
 }
 
 const BRAND_TYPES = [
@@ -22,10 +31,10 @@ const BRAND_TYPES = [
 const PLAN_OPTIONS = [
   { value: 'Starter', label: 'Starter (Free)' },
   { value: 'Professional', label: 'Professional (₦25,000/mo)' },
-  { value: 'Enterprise', label: 'Enterprise (Contact Sales)' }
+  { value: 'Enterprise', label: 'Enterprise (Contact Sales)', disabled: true }
 ];
 
-export default function SignupPage({ onNavigate }: SignupPageProps) {
+export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPageProps) {
   const [fullName, setFullName] = useState('');
   const [brandName, setBrandName] = useState('');
   const [brandType, setBrandType] = useState('Native Wear');
@@ -35,7 +44,6 @@ export default function SignupPage({ onNavigate }: SignupPageProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [plan, setPlan] = useState('Starter');
-  const [showEnterpriseConfirmation, setShowEnterpriseConfirmation] = useState(false);
 
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
@@ -51,64 +59,44 @@ export default function SignupPage({ onNavigate }: SignupPageProps) {
   const [pendingSignupPayload, setPendingSignupPayload] = useState<any>(null);
 
   const executeFinalSignup = async (payload: any) => {
-  // 🔥 FIRST: Check if Enterprise plan
-  if (payload.plan?.toLowerCase() === 'enterprise') {
-    localStorage.setItem('vt_signup_metadata', JSON.stringify({
-      fullName: payload.fullName,
-      brandName: payload.brandName,
-      brandType: payload.brandType,
-      brandDescription: payload.brandDescription,
-      brandLocation: payload.brandLocation,
-      email: payload.email,
-      plan: payload.plan,
-      couponCode: payload.couponCode || null,
-      hasDevAccess: payload.hasDevAccess,
-      paystackReference: payload.paystackReference || null,
-      paidAmount: payload.paidAmount || null
-    }));
-    setShowEnterpriseConfirmation(true);
-    return;
-  }
+    setIsLoading(true);
+    try {
+      localStorage.setItem('vt_signup_metadata', JSON.stringify({
+        fullName: payload.fullName,
+        brandName: payload.brandName,
+        brandType: payload.brandType,
+        brandDescription: payload.brandDescription,
+        brandLocation: payload.brandLocation,
+        email: payload.email,
+        plan: payload.plan,
+        couponCode: payload.couponCode || null,
+        hasDevAccess: payload.hasDevAccess,
+        paystackReference: payload.paystackReference || null,
+        paidAmount: payload.paidAmount || null
+      }));
 
-  // ✅ THEN: Continue with loading state for Starter/Professional
-  setIsLoading(true);
-  try {
-    localStorage.setItem('vt_signup_metadata', JSON.stringify({
-      fullName: payload.fullName,
-      brandName: payload.brandName,
-      brandType: payload.brandType,
-      brandDescription: payload.brandDescription,
-      brandLocation: payload.brandLocation,
-      email: payload.email,
-      plan: payload.plan,
-      couponCode: payload.couponCode || null,
-      hasDevAccess: payload.hasDevAccess,
-      paystackReference: payload.paystackReference || null,
-      paidAmount: payload.paidAmount || null
-    }));
+      await registerUser(payload);
 
-    await registerUser(payload);
+      setIsLoading(false);
+      setIsSubmitted(true);
 
-    setIsLoading(false);
-    setIsSubmitted(true);
-
-    if (onSignupSuccess) {
-      onSignupSuccess(
-        payload.fullName,
-        payload.email,
-        payload.plan,
-        payload.hasDevAccess,
-        payload.brandName,
-        payload.brandType,
-        payload.brandDescription,
-        payload.brandLocation
-      );
+      if (onSignupSuccess) {
+        onSignupSuccess(
+          payload.fullName,
+          payload.email,
+          payload.plan,
+          payload.hasDevAccess,
+          payload.brandName,
+          payload.brandType,
+          payload.brandDescription,
+          payload.brandLocation
+        );
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setGeneralError(err?.message || 'Failed to create account. Please try again.');
     }
-  } catch (err: any) {
-    setIsLoading(false);
-    setGeneralError(err?.message || 'Failed to create account. Please try again.');
-  }
-};
+  };
 
   const handleApplyCoupon = () => {
     setCouponError('');
@@ -246,35 +234,6 @@ export default function SignupPage({ onNavigate }: SignupPageProps) {
       </div>
     );
   }
-  if (showEnterpriseConfirmation) {
-  return (
-    <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-6 font-sans">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center flex flex-col items-center gap-5">
-        <div className="w-16 h-16 bg-[#0F5132] text-white rounded-full flex items-center justify-center text-3xl">
-          <Mail className="w-8 h-8" />
-        </div>
-        <div>
-          <h2 className="font-display text-2xl font-bold text-gray-900">🎉 Thank You!</h2>
-          <p className="text-gray-600 text-sm mt-2 leading-relaxed">
-            Your Enterprise plan request has been received.
-          </p>
-          <p className="text-gray-500 text-xs mt-3 leading-relaxed">
-            Our team will review your application and contact you within 24-48 hours.
-          </p>
-          <p className="text-gray-500 text-xs mt-1 leading-relaxed">
-            We'll be in touch soon!
-          </p>
-        </div>
-        <button
-          onClick={() => onNavigate('landing')}
-          className="w-full sm:w-auto min-w-[160px] max-w-xs bg-[#0F5132] hover:bg-[#145A32] text-white py-2.5 px-6 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
-        >
-          Back to Home
-        </button>
-      </div>
-    </div>
-  );
-}
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col justify-center items-center py-12 px-4 sm:px-6 font-sans">
@@ -346,16 +305,16 @@ export default function SignupPage({ onNavigate }: SignupPageProps) {
                 <div className="relative">
                   <Tag className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                   <select
-  value={plan}
-  onChange={(e) => handlePlanChange(e.target.value)}
-  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F5132] text-gray-900 cursor-pointer font-medium"
->
-  <option value="Starter">Starter (Free)</option>
-  <option value="Professional">Professional (₦25,000/mo)</option>
-  <option value="Enterprise" disabled className="text-gray-400">
-    Enterprise (Contact Sales)
-  </option>
-</select>
+                    value={plan}
+                    onChange={(e) => handlePlanChange(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F5132] text-gray-900 cursor-pointer font-medium"
+                  >
+                    {PLAN_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value} disabled={p.disabled} className={p.disabled ? 'text-gray-400' : ''}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

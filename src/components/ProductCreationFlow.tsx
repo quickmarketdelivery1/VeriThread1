@@ -310,62 +310,70 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
   };
 
   const handlePublish = (isPublishing: boolean) => {
-    // 1. Strict limit check on active publication
-    const qrResult = incrementQRCount();
-    if (!qrResult.allowed) {
-      const freshBrand = getBrand();
-      setUpgradeModalConfig({
-        featureName: "Digital Passport QR Codes",
-        description: qrResult.message || `You have reached the monthly limit of active QR passport certifications for the ${freshBrand.plan.toUpperCase()} tier.`
-      });
-      setShowUpgradeModal(true);
-      return;
+    try {
+      // 1. Strict limit check on active publication
+      const qrResult = incrementQRCount();
+      if (!qrResult.allowed) {
+        const freshBrand = getBrand();
+        setUpgradeModalConfig({
+          featureName: "Digital Passport QR Codes",
+          description: qrResult.message || `You have reached the monthly limit of active QR passport certifications for the ${freshBrand.plan.toUpperCase()} tier.`
+        });
+        setShowUpgradeModal(true);
+        return;
+      }
+
+      const finalCare = [...selectedCare];
+      if (customCare.trim()) {
+        finalCare.push(customCare.trim());
+      }
+
+      const safeName = (name || 'Bespoke Garment').trim();
+      const uniqueId = `prod-${safeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(10 + Math.random() * 90)}`;
+
+      const newProduct: Product = {
+        id: uniqueId,
+        brandId: brand.id || 'brand-1',
+        collectionId: collectionId || undefined,
+        name: safeName,
+        sku: sku || `AA-TRD-${Math.floor(100 + Math.random() * 900)}`,
+        category: category || 'Traditional Wear',
+        description: `Premium bespoke tailored ${safeName}. Sourced and handcrafted in Nigeria.`,
+        priceMin: priceMin !== '' ? priceMin : undefined,
+        priceMax: priceMax !== '' ? priceMax : undefined,
+        fabric: fabric || 'Premium Fabric',
+        material: material || 'Cotton',
+        gsm: gsm || 'Medium 150-200',
+        color: color || 'Bespoke',
+        fit: fit || 'Regular',
+        careInstructions: finalCare,
+        sizeGuide: sizeGuide || undefined,
+        story: story || undefined,
+        founderMessage: founderMessage || undefined,
+        founderPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150&h=150',
+        collectionStory: collectionStory || undefined,
+        heroImage: heroImage || 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800',
+        galleryImages: galleryImages.filter(img => img && img.trim() !== ''),
+        videoUrl: videoUrl || undefined,
+        buyNowType: buyNowType || 'whatsapp',
+        buyNowValue: buyNowValue || '+234 812 345 6789',
+        warrantyPeriod: warrantyPeriod || 12,
+        isActive: true,
+        isPublished: isPublishing,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      saveProduct(newProduct);
+      setCreatedProductId(uniqueId);
+      setIsSuccess(true);
+      onRefresh();
+      // Reset scroll position to top so the user immediately sees the success screen on mobile
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error("Error publishing product:", err);
+      alert("Could not certify product passport. Please check required fields and try again.");
     }
-
-    const finalCare = [...selectedCare];
-    if (customCare.trim()) {
-      finalCare.push(customCare.trim());
-    }
-
-    const uniqueId = `prod-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(10 + Math.random() * 90)}`;
-
-    const newProduct: Product = {
-      id: uniqueId,
-      brandId: brand.id,
-      collectionId: collectionId || undefined,
-      name,
-      sku,
-      category,
-      description: `Premium bespoke tailored ${name}. Sourced and handcrafted in Nigeria.`,
-      priceMin: priceMin !== '' ? priceMin : undefined,
-      priceMax: priceMax !== '' ? priceMax : undefined,
-      fabric,
-      material,
-      gsm,
-      color,
-      fit,
-      careInstructions: finalCare,
-      sizeGuide: sizeGuide || undefined,
-      story: story || undefined,
-      founderMessage: founderMessage || undefined,
-      founderPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150&h=150',
-      collectionStory: collectionStory || undefined,
-      heroImage,
-      galleryImages: galleryImages.filter(img => img && img.trim() !== ''),
-      videoUrl: videoUrl || undefined,
-      buyNowType,
-      buyNowValue,
-      warrantyPeriod,
-      isActive: true,
-      isPublished: isPublishing,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    saveProduct(newProduct);
-    setCreatedProductId(uniqueId);
-    setIsSuccess(true);
-    onRefresh();
   };
 
   if (isSuccess) {
@@ -1216,7 +1224,61 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
           </div>
         )}
 
-        
+        {/* Navigation Buttons Row */}
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-3 w-full">
+          {currentStep > 1 ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleBack();
+              }}
+              className="px-4 py-3 sm:py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 sm:bg-transparent hover:bg-gray-100 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1.5 min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+            >
+              <ArrowLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Back
+            </button>
+          ) : (
+            <div className="w-1 hidden sm:block" />
+          )}
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+            {currentStep === 5 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePublish(false);
+                  }}
+                  className="px-4 py-3 sm:py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto bg-white"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePublish(true);
+                  }}
+                  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+                >
+                  <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Certify & Publish
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNext();
+                }}
+                className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+              >
+                Next Step <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
       </div>
 
@@ -1358,49 +1420,6 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
                 🔒 Secured by Paystack and Stripe. Refundable 14-day premium guarantee.
               </p>
             </form>
-            {/* Navigation Buttons Row */}
-        <div className="flex flex-row items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-2 w-full">
-          {currentStep > 1 ? (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="px-3.5 py-2.5 text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100/60 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1 min-h-[44px] touch-manipulation"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
-            </button>
-          ) : (
-            <div className="w-1" />
-          )}
-
-          <div className="flex flex-row items-center gap-2 sm:gap-3">
-            {currentStep === 5 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handlePublish(false)}
-                  className="px-3.5 py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[44px] touch-manipulation"
-                >
-                  Save Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePublish(true)}
-                  className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2.5 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 whitespace-nowrap min-h-[44px] touch-manipulation"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" /> Certify & Publish
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 sm:px-5 py-2.5 rounded-full text-xs font-semibold shadow-sm cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 whitespace-nowrap min-h-[44px] touch-manipulation"
-              >
-                Next Step <ArrowRight className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        </div>
 
           </div>
         </div>
@@ -1409,4 +1428,3 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     </div>
   );
 }
- 

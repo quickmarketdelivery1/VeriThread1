@@ -90,70 +90,70 @@ export default function LandingPage({ onNavigate, onBypassLogin, isLoggedIn }: L
   ];
 
   const testimonials = [
-  {
-    name: "Adeola",
-    brand: "Adeleke Atelier",
-    location: "Lagos, Nigeria",
-    quote: "Before VeriThread, I didn't know who bought my clothes. Customers would buy, leave, and I'd never see them again. Now I have a database of every person who owns my pieces. I send them new collections and they actually come back. My repeat sales have doubled.",
-    image: "https://ui-avatars.com/api/?name=Adeola+Adebayo&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Chidi",
-    brand: "Chidi's Native Wear",
-    location: "Abuja, Nigeria",
-    quote: "I sell everything through WhatsApp. Customers used to ask me a hundred questions before buying — is it authentic? What's the fabric? How do I wash it? Now they scan the QR code, see everything themselves, and buy faster. I spend less time answering questions and more time creating.",
-    image: "https://ui-avatars.com/api/?name=Chidi+Okonkwo&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Fatima",
-    brand: "Fatima's Fashion House",
-    location: "Kano, Nigeria",
-    quote: "My brand is small. I can't afford luxury packaging or a big marketing team. But with VeriThread, my products look like they cost twice as much. Customers see the digital passport and think they're buying from a premium brand. It's completely changed how people perceive my work.",
-    image: "https://ui-avatars.com/api/?name=Fatima+Aliyu&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Emeka",
-    brand: "Lagos Streetwear Co.",
-    location: "Lagos, Nigeria",
-    quote: "I've been running my streetwear brand for three years. I always struggled to get repeat customers. VeriThread changed that. Now when someone buys a hoodie, I can send them care tips, behind-the-scenes content, and early access to new drops. They feel connected to the brand. They keep buying.",
-    image: "https://ui-avatars.com/api/?name=Emeka+Okafor&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Zainab",
-    brand: "Zainab's Luxury Studio",
-    location: "Ibadan, Nigeria",
-    quote: "Running a fashion brand in Nigeria is hard. You're competing with imported goods and big brands. VeriThread gives me a way to stand out. My customers trust me more because they can verify authenticity. It's not just software — it's a business partner.",
-    image: "https://ui-avatars.com/api/?name=Zainab+Abdullahi&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Tunde",
-    brand: "Tunde's Bespoke Tailoring",
-    location: "Ilorin, Nigeria",
-    quote: "I'm a tailor, not a tech person. When I first heard about VeriThread, I thought it would be too complicated. But it's so simple. I just fill in the details, upload photos, and get a QR code. My customers love scanning it. It makes me look like I'm running a big brand.",
-    image: "https://ui-avatars.com/api/?name=Tunde+Balogun&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Ngozi",
-    brand: "Ngozi's Ankara Collection",
-    location: "Enugu, Nigeria",
-    quote: "I used to lose customers after they bought from me. They'd wear the clothes and disappear. Now with VeriThread, every customer who buys gets a digital passport. When they scan it, they see my story, my new collections, and they come back. It's like having a permanent connection to my customers.",
-    image: "https://ui-avatars.com/api/?name=Ngozi+Eze&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Segun",
-    brand: "Segun's Premium Denim",
-    location: "Abeokuta, Nigeria",
-    quote: "I never knew who was buying my jeans. Was it young people? Older people? People from Lagos? Now VeriThread shows me exactly who buys from me — name, location, and what they bought. I can finally understand my customers and make products they actually want.",
-    image: "https://ui-avatars.com/api/?name=Segun+Adebayo&background=0F5132&color=fff&size=120"
-  },
-  {
-    name: "Halima",
-    brand: "Halima's Silk Studio",
-    location: "Kaduna, Nigeria",
-    quote: "I make luxury silk garments for weddings and special events. My customers need to trust that what they're buying is authentic and high quality. VeriThread gives them that trust. The digital passport shows them everything — the fabric, the care instructions, the warranty. They buy with confidence.",
-    image: "https://ui-avatars.com/api/?name=Halima+Mohammed&background=0F5132&color=fff&size=120"
-  }
-];
+    {
+      name: "Adeola",
+      brand: "Adeleke Atelier",
+      location: "Lagos, Nigeria",
+      quote: "Before VeriThread, I didn't know who bought my clothes. Customers would buy, leave, and I'd never see them again. Now I have a database of every person who owns my pieces. I send them new collections and they actually come back. My repeat sales have doubled.",
+      image: "https://ui-avatars.com/api/?name=Adeola&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Chidi",
+      brand: "Chidi's Native Wear",
+      location: "Abuja, Nigeria",
+      quote: "I sell everything through WhatsApp. Customers used to ask me a hundred questions before buying — is it authentic? What's the fabric? How do I wash it? Now they scan the QR code, see everything themselves, and buy faster.",
+      image: "https://ui-avatars.com/api/?name=Chidi&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Fatima",
+      brand: "Fatima's Fashion House",
+      location: "Kano, Nigeria",
+      quote: "My brand is small, but with VeriThread, my products look like they cost twice as much. Customers see the digital passport and know they are buying from a premium brand.",
+      image: "https://ui-avatars.com/api/?name=Fatima&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Emeka",
+      brand: "Lagos Streetwear Co.",
+      location: "Lagos, Nigeria",
+      quote: "Now when someone buys a hoodie, I can send them care tips, behind-the-scenes stories, and early access to new drops. They feel connected to the brand and keep coming back for new collections.",
+      image: "https://ui-avatars.com/api/?name=Emeka&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Zainab",
+      brand: "Zainab's Luxury Studio",
+      location: "Ibadan, Nigeria",
+      quote: "VeriThread gives me a distinct way to stand out. My customers trust me more because they can verify authenticity instantly on their smartphones.",
+      image: "https://ui-avatars.com/api/?name=Zainab&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Tunde",
+      brand: "Tunde's Bespoke Tailoring",
+      location: "Ilorin, Nigeria",
+      quote: "Every suit I tailor now carries a digital passport. My clients love showing off the QR code tag to their friends at events, bringing in high-value word-of-mouth referrals.",
+      image: "https://ui-avatars.com/api/?name=Tunde&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Ngozi",
+      brand: "Ngozi's Ankara Collection",
+      location: "Enugu, Nigeria",
+      quote: "Our authentic print heritage is preserved with digital tags. Buyers across Nigeria and abroad can trace textile origin and register their warranty effortlessly.",
+      image: "https://ui-avatars.com/api/?name=Ngozi&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Segun",
+      brand: "Segun's Premium Denim",
+      location: "Abeokuta, Nigeria",
+      quote: "Managing customer records and product care instructions used to be messy. VeriThread automated the entire warranty registration and post-purchase follow-up process.",
+      image: "https://ui-avatars.com/api/?name=Segun&background=0F5132&color=fff&size=120"
+    },
+    {
+      name: "Halima",
+      brand: "Halima's Silk Studio",
+      location: "Kaduna, Nigeria",
+      quote: "Digital passports give our delicate silk pieces an ultra-luxury feel. Our clients appreciate the transparent care guides and authentic ownership certificates.",
+      image: "https://ui-avatars.com/api/?name=Halima&background=0F5132&color=fff&size=120"
+    }
+  ];
 
   const faqs = [
     {
@@ -335,9 +335,9 @@ export default function LandingPage({ onNavigate, onBypassLogin, isLoggedIn }: L
 
             <div className="flex items-center gap-4 mt-6 pt-6 border-t border-gray-200">
               <div className="flex -space-x-2 shrink-0">
-                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100&h=100" alt="Adeole" />
-                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100&h=100" alt="Chidi" />
-                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=100&h=100" alt="Fatima" />
+                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://ui-avatars.com/api/?name=Adeola&background=0F5132&color=fff&size=100" alt="Adeola" />
+                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://ui-avatars.com/api/?name=Chidi&background=0F5132&color=fff&size=100" alt="Chidi" />
+                <img className="w-8 h-8 rounded-full border-2 border-white object-cover shrink-0" src="https://ui-avatars.com/api/?name=Fatima&background=0F5132&color=fff&size=100" alt="Fatima" />
               </div>
               <p className="text-xs text-gray-500 font-medium leading-normal">
                 Over <strong className="text-gray-900 font-semibold">120+ fashion labels</strong> in Lagos, Abuja, Kano, and Ibadan are already certifying provenance.
@@ -366,7 +366,7 @@ export default function LandingPage({ onNavigate, onBypassLogin, isLoggedIn }: L
                 {/* Hero Banner */}
                 <div className="relative h-44 bg-gray-200">
                   <img 
-                    src="https://images.unsplash.com/photo-1733324961705-97bd6cd7f4ba?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                    src="https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=400" 
                     className="w-full h-full object-cover" 
                     alt="Product" 
                   />
@@ -378,8 +378,8 @@ export default function LandingPage({ onNavigate, onBypassLogin, isLoggedIn }: L
                 {/* Info block */}
                 <div className="p-3.5 flex flex-col gap-2.5">
                   <div>
-                    <p className="text-[10px] uppercase font-semibold text-emerald-800">Nigerian Heritage House</p>
-                    <h4 className="font-display text-sm font-bold text-gray-900 leading-tight">Premium Ankara Collection</h4>
+                    <p className="text-[10px] uppercase font-semibold text-emerald-800">Haute Couture Atelier</p>
+                    <h4 className="font-display text-sm font-bold text-gray-900 leading-tight">Signature Heritage Agbada</h4>
                     <p className="text-[9px] text-gray-500 font-mono mt-0.5">SKU: VT-PASSPORT-001</p>
                   </div>
 

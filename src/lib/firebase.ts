@@ -134,7 +134,7 @@ export async function registerUser(userData: {
       type: userData.brandType,
       description: userData.brandDescription.trim(),
       location: userData.brandLocation.trim(),
-      logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+      logoUrl: '',
       primaryColor: '#0F5132',
       secondaryColor: '#145A32',
       supportEmail: cleanEmail,
@@ -152,6 +152,11 @@ export async function registerUser(userData: {
       lastResetDate: new Date().toISOString()
     };
     await setDoc(brandRef, newBrand, { merge: true });
+
+    // Ensure newly registered user is signed out until they verify email
+    try {
+      await signOut(auth);
+    } catch (e) {}
 
     return { user };
   } catch (err: any) {
@@ -186,6 +191,9 @@ export async function loginUser(
       } catch (e) {
         console.warn('Could not re-send verification:', e);
       }
+      try {
+        await signOut(auth);
+      } catch (e) {}
       throw new Error('Please verify your email before logging in. A new verification link has been sent to your email.');
     }
 
@@ -208,7 +216,7 @@ export async function loginUser(
           const bData = brandSnap.data();
           userData = {
             uid: user.uid,
-            fullName: meta?.fullName || user.displayName || 'Brand Owner',
+            fullName: meta?.fullName || user.displayName || '',
             brandName: bData.name || meta?.brandName || '',
             brandType: bData.type || meta?.brandType || '',
             brandDescription: bData.description || meta?.brandDescription || '',
@@ -219,7 +227,7 @@ export async function loginUser(
         } else if (meta) {
           userData = {
             uid: user.uid,
-            fullName: meta.fullName || user.displayName || 'Brand Owner',
+            fullName: meta.fullName || user.displayName || '',
             brandName: meta.brandName || '',
             brandType: meta.brandType || '',
             brandDescription: meta.brandDescription || '',
@@ -259,7 +267,7 @@ export async function getUserFirestoreDoc(uid: string): Promise<any> {
       const b = brandSnap.data();
       return {
         uid,
-        fullName: meta?.fullName || 'Brand Owner',
+        fullName: meta?.fullName || '',
         brandName: b.name || meta?.brandName || '',
         brandType: b.type || meta?.brandType || '',
         brandDescription: b.description || meta?.brandDescription || '',
@@ -378,6 +386,7 @@ export async function syncBrandInFirestore(
         location: userProfile?.brandLocation || brandLocation || existingData.location || '',
         plan: plan || existingData.plan || 'starter',
         supportEmail: email || existingData.supportEmail || email,
+        logoUrl: typeof existingData.logoUrl === 'string' ? existingData.logoUrl : '',
       };
       await setDoc(brandRef, updated, { merge: true });
       return updated;
@@ -395,7 +404,7 @@ export async function syncBrandInFirestore(
     description: brandDesc,
     location: brandLocation,
     slug: brandName.toLowerCase().replace(/\s+/g, '-'),
-    logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+    logoUrl: '',
     primaryColor: '#0F5132',
     secondaryColor: '#D4AF37',
     supportEmail: email,

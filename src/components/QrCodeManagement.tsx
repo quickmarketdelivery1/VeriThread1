@@ -208,9 +208,9 @@ export default function QrCodeManagement({ onNavigate }: QrCodeManagementProps) 
                       level="H"
                       includeMargin={true}
                       imageSettings={
-                        showLogo 
+                        (showLogo && brand.logoUrl)
                           ? {
-                              src: brand.logoUrl || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150",
+                              src: brand.logoUrl,
                               x: undefined,
                               y: undefined,
                               height: 32,

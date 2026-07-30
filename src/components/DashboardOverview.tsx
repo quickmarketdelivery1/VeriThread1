@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, QrCode, Globe, ArrowUpRight, ShieldCheck, UserCheck, Smartphone, Eye, RefreshCw, AlertCircle, Calendar, Sparkles, Heart } from 'lucide-react';
+import { Plus, QrCode, Globe, ArrowUpRight, ShieldCheck, UserCheck, Smartphone, Eye, RefreshCw, AlertCircle, Calendar, Sparkles, CheckCircle, Heart } from 'lucide-react';
 import { Product, Collection, QRCode, Ownership, AnalyticsEvent } from '../types';
 import { getProducts, getQRCodes, getOwnerships, getAnalyticsEvents, getBrand } from '../lib/storage';
 import ProBadge from './ProBadge';
@@ -16,7 +16,7 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
   const qrcodes = getQRCodes();
   const ownerships = getOwnerships();
   const activities = getAnalyticsEvents();
- 
+  const [opportunityNotice, setOpportunityNotice] = useState<string | null>(null);
 
   // Compute metrics dynamically
   const totalProducts = products.length;
@@ -39,7 +39,7 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
     }
   })();
 
-  const fullName = userObj?.fullName || userObj?.name || 'Brand Owner';
+  const fullName = userObj?.fullName || userObj?.name || brand.name || '';
   const displayBrandName = brand.name || userObj?.brandName || '';
   const displayBrandType = brand.type || userObj?.brandType || '';
   const displayBrandDesc = brand.description || userObj?.brandDescription || '';
@@ -53,7 +53,7 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-display text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
-              Welcome to VeriThread, {fullName}!
+              Welcome to VeriThread{fullName ? `, ${fullName}` : ''}!
             </h2>
             <ProBadge plan={brand.plan} size="md" />
           </div>
@@ -292,7 +292,68 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
             </div>
           </div>
 
-          
+          {/* Today's Growth Opportunities */}
+          {opportunityNotice && (
+            <div className="bg-emerald-50 border border-emerald-100 text-[#0F5132] text-xs p-4 rounded-xl flex items-center justify-between gap-3 animate-slide-in shadow shrink-0">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-[#0F5132]" />
+                <div>
+                  <span className="font-bold block">Campaign Transmitted</span>
+                  <span className="text-gray-500 text-[10px]">{opportunityNotice} automated trigger successfully deployed to segment.</span>
+                </div>
+              </div>
+              <button onClick={() => setOpportunityNotice(null)} className="text-[10px] font-bold text-gray-400 hover:text-gray-900 cursor-pointer">
+                DISMISS
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-display text-sm font-semibold text-[#0F5132] uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" /> Today's Growth Opportunities
+              </h3>
+              <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-bold">Action Suggested</span>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
+                <span className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5">
+                  <AlertCircle className="w-4 h-4" />
+                </span>
+                <div>
+                  <h4 className="font-bold text-xs text-gray-900">18 Scanned Visitors Unregistered</h4>
+                  <p className="text-[10px] text-gray-500 mt-1 leading-normal">
+                    18 shoppers inspected digital passports today but haven't registered their garment warranties.
+                  </p>
+                  <button
+                    onClick={() => setOpportunityNotice("WhatsApp Retargeting Reminder")}
+                    className="mt-3 bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 h-7 rounded-full text-[10px] font-bold cursor-pointer transition-all self-start"
+                  >
+                    Ping WhatsApp Reminder
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
+                <span className="p-2 rounded-lg bg-emerald-50 text-[#0F5132] shrink-0 mt-0.5">
+                  <Calendar className="w-4 h-4" />
+                </span>
+                <div>
+                  <h4 className="font-bold text-xs text-gray-900">3 Registered Birthdays This Week</h4>
+                  <p className="text-[10px] text-gray-500 mt-1 leading-normal">
+                    3 registered brand owners are celebrating this week. Delight them with a custom brand token.
+                  </p>
+                  <button
+                    onClick={() => setOpportunityNotice("Birthday Congratulatory Gift Coupon")}
+                    className="mt-3 bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 h-7 rounded-full text-[10px] font-bold cursor-pointer transition-all self-start"
+                  >
+                    Dispatch Gift Coupon
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Main layout (Split activity & metrics details) */}
           <div className="grid lg:grid-cols-12 gap-6">

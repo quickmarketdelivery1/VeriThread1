@@ -7,7 +7,6 @@ import {
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
-import AuthCallback from './components/AuthCallback';
 import DemoBanner from './components/DemoBanner';
 import DashboardOverview from './components/DashboardOverview';
 import ProductsListPage from './components/ProductsListPage';
@@ -127,7 +126,7 @@ export default function App() {
         const userHasDevAccess = Boolean(metadata?.hasDevAccess || userBrand.hasDevAccess || getHasDevAccess());
         if (userHasDevAccess) setHasDevAccess(true);
 
-        const fullName = userDoc?.fullName || metadata?.fullName || firebaseUser.displayName || 'Brand Owner';
+        const fullName = userDoc?.fullName || metadata?.fullName || firebaseUser.displayName || userBrand.name || '';
         const authedUser = { 
           email, 
           fullName, 
@@ -251,26 +250,29 @@ export default function App() {
     navigateTo('dashboard');
   };
 
-  const handleSignupSuccess = (name: string, email: string, plan: 'starter' | 'professional' | 'enterprise', userHasDevAccess?: boolean, brandName?: string, brandType?: string, brandDescription?: string, brandLocation?: string) => {
-  const isDev = Boolean(userHasDevAccess);
-  setHasDevAccess(isDev);
+  const handleSignupSuccess = (
+    name: string,
+    email: string,
+    plan: 'starter' | 'professional' | 'enterprise',
+    userHasDevAccess?: boolean,
+    brandName?: string,
+    brandType?: string,
+    brandDescription?: string,
+    brandLocation?: string
+  ) => {
+    const isDev = Boolean(userHasDevAccess);
+    setHasDevAccess(isDev);
 
-  const authedUser = { 
-    email, 
-    fullName: name || 'Brand Owner', 
-    name: name || 'Brand Owner',
-    brandName: brandName || '',
-    brandType: brandType || '',
-    brandDescription: brandDescription || '',
-    brandLocation: brandLocation || '',
-    plan: plan || 'starter',
-    hasDevAccess: isDev 
-  };
-  localStorage.setItem('vt_auth_user', JSON.stringify(authedUser));
-  setUser(authedUser);
+    const cleanName = name?.trim() || '';
+    const cleanBrandName = brandName?.trim() || '';
+    const cleanBrandType = brandType?.trim() || 'Native Wear';
+    const cleanBrandDesc = brandDescription?.trim() || '';
+    const cleanBrandLoc = brandLocation?.trim() || '';
+
+    const finalBrandName = cleanBrandName || (cleanName ? `${cleanName.toUpperCase()} ATELIER` : `${email.split('@')[0].toUpperCase()} ATELIER`);
 
     recordBrandSignup({
-      name: name || `${email.split('@')[0].toUpperCase()} ATELIER`,
+      name: finalBrandName,
       email: email,
       plan: plan,
       hasDevAccess: isDev,
@@ -280,9 +282,12 @@ export default function App() {
     const newBrand = {
       id: `brand-${Date.now()}`,
       userId: `user-${Date.now()}`,
-      name: `${name.toUpperCase()} ATELIER`,
-      slug: name.toLowerCase().replace(/[^a-z0-9]/g, ''),
-      logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+      name: finalBrandName,
+      slug: finalBrandName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      type: brandType || 'Native Wear',
+      description: brandDescription || '',
+      location: brandLocation || '',
+      logoUrl: '',
       coverUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=800',
       primaryColor: '#0F5132',
       secondaryColor: '#145A32',
@@ -308,8 +313,6 @@ export default function App() {
     localStorage.setItem('vt_fresh_slate', 'true');
     setIsFreshBrand(true);
     setBrand(newBrand);
-
-    navigateTo('dashboard');
   };
 
   // Demo / Guest mode bypass
@@ -331,7 +334,7 @@ export default function App() {
     const previewUser = { 
       email: 'preview@verithread.demo', 
       name: 'PREVIEW USER', 
-      brandName: currentBrand.name || '',
+      brandName: currentBrand.name || 'ADELEKE ATELIER',
       hasDevAccess: true,
       isPreview: true,
       isReadOnly: true 
@@ -375,17 +378,6 @@ export default function App() {
     return <DemoDashboard onNavigate={navigateTo} />;
   }
 
-  // 2. AUTH CALLBACK & MAGIC LINK PROCESSING
-  if (currentRoute === 'auth-callback' || isAuthenticating || (authError && !user)) {
-    return (
-      <AuthCallback 
-        isAuthenticating={isAuthenticating} 
-        error={authError} 
-        onNavigate={navigateTo} 
-      />
-    );
-  }
-
   // 3. MARKETING & AUTH PAGES
   if (currentRoute === 'landing') {
     return (
@@ -411,9 +403,7 @@ export default function App() {
       return (
         <SignupPage 
           onNavigate={navigateTo} 
-          onSignupSuccess={(name, email, plan, hasDevAccess, brandName, brandType, brandDescription, brandLocation) =>
-  handleSignupSuccess(name, email, plan, hasDevAccess, brandName, brandType, brandDescription, brandLocation)
-} 
+          onSignupSuccess={handleSignupSuccess} 
         />
       );
     }
@@ -436,12 +426,18 @@ export default function App() {
             
             {/* Atelier Brand Identity Header */}
             <div className="flex items-center gap-3">
-              <img 
-                className="w-10 h-10 rounded-lg object-cover border border-white/20 shadow-sm" 
-                src={brand.logoUrl || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150"} 
-                alt="" 
-                referrerPolicy="no-referrer"
-              />
+              {brand.logoUrl ? (
+                <img 
+                  className="w-10 h-10 rounded-lg object-cover border border-white/20 shadow-sm" 
+                  src={brand.logoUrl} 
+                  alt="" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-emerald-900 border border-white/20 flex items-center justify-center font-display font-bold text-white text-base shadow-sm shrink-0">
+                  {brand.name ? brand.name.charAt(0).toUpperCase() : 'V'}
+                </div>
+              )}
               <div className="min-w-0">
                 <h1 className="font-display font-bold text-sm text-white truncate uppercase tracking-tight leading-none">
                   {brand.name}
@@ -540,7 +536,13 @@ export default function App() {
           {/* Mobile Header Bar */}
           <header className="md:hidden bg-white border-b border-gray-200 px-6 h-16 flex items-center justify-between sticky top-0 z-40 shrink-0">
           <div className="flex items-center gap-2.5">
-            <img className="w-8 h-8 rounded-full object-cover" src={brand.logoUrl} alt="" referrerPolicy="no-referrer" />
+            {brand.logoUrl ? (
+              <img className="w-8 h-8 rounded-full object-cover" src={brand.logoUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-[#0F5132] text-white flex items-center justify-center font-display font-bold text-xs shrink-0">
+                {brand.name ? brand.name.charAt(0).toUpperCase() : 'V'}
+              </div>
+            )}
             <span className="font-display font-semibold text-sm text-gray-900 uppercase tracking-tight">{brand.name}</span>
           </div>
           

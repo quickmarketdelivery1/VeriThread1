@@ -5,7 +5,7 @@ export const sampleBrand: Brand = {
   userId: 'default-user-id',
   name: '',
   slug: '',
-  logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+  logoUrl: '',
   description: '',
   websiteUrl: '',
   primaryColor: '#0F5132',

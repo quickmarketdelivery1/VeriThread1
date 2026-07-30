@@ -86,7 +86,7 @@ export function initStorage() {
       type: brandType,
       description: brandDesc,
       location: brandLocation,
-      logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+      logoUrl: '',
       primaryColor: '#0F5132',
       secondaryColor: '#145A32',
       supportEmail: supportEmail,
@@ -202,7 +202,21 @@ export function isPreviewModeReadOnly(): boolean {
 export function getBrand(): Brand {
   initStorage();
   const data = localStorage.getItem(KEYS.BRAND);
-  return data ? JSON.parse(data) : sampleBrand;
+  if (data) {
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...parsed,
+          logoUrl: typeof parsed.logoUrl === 'string' ? parsed.logoUrl : ''
+        };
+      }
+    } catch (e) {}
+  }
+  return {
+    ...sampleBrand,
+    logoUrl: ''
+  };
 }
 
 export function saveBrand(brand: Brand) {
@@ -210,8 +224,12 @@ export function saveBrand(brand: Brand) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return;
   }
-  localStorage.setItem(KEYS.BRAND, JSON.stringify(brand));
-  saveBrandFirestore(brand).catch(err => console.warn('Firestore sync brand warning:', err));
+  const cleanBrand: Brand = {
+    ...brand,
+    logoUrl: typeof brand.logoUrl === 'string' ? brand.logoUrl : ''
+  };
+  localStorage.setItem(KEYS.BRAND, JSON.stringify(cleanBrand));
+  saveBrandFirestore(cleanBrand).catch(err => console.warn('Firestore sync brand warning:', err));
 }
 
 function isUserRegisteredSession(): boolean {
@@ -485,7 +503,13 @@ export function registerWarranty(productId: string, customerData: { email: strin
 export function getAnalyticsEvents(): AnalyticsEvent[] {
   initStorage();
   const data = localStorage.getItem(KEYS.ANALYTICS);
-  return data ? JSON.parse(data) : sampleAnalyticsEvents;
+  if (data) {
+    try {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return isUserRegisteredSession() ? [] : sampleAnalyticsEvents;
 }
 
 export function recordAnalyticsEvent(event: AnalyticsEvent) {
@@ -609,7 +633,7 @@ export function clearStorage() {
   localStorage.setItem(KEYS.BRAND, JSON.stringify({
     id: 'custom-brand-id',
     name: 'My Luxury Brand',
-    logoUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=150&h=150',
+    logoUrl: '',
     coverUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=800',
     primaryColor: '#0F5132',
     secondaryColor: '#145A32',

@@ -27,7 +27,7 @@ export default function BrandSettings({ onRefresh }: BrandSettingsProps) {
 
   const [name, setName] = useState(brand.name);
   const [slogan, setSlogan] = useState(brand.slogan || '');
-  const [logoUrl, setLogoUrl] = useState(brand.logoUrl);
+  const [logoUrl, setLogoUrl] = useState(brand.logoUrl || '');
   const [coverUrl, setCoverUrl] = useState(brand.coverUrl);
   const [primaryColor, setPrimaryColor] = useState(brand.primaryColor || '#0F5132');
   const [secondaryColor, setSecondaryColor] = useState(brand.secondaryColor || '#145A32');
@@ -45,10 +45,6 @@ export default function BrandSettings({ onRefresh }: BrandSettingsProps) {
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPaystackModal, setShowPaystackModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-const [inviteEmail, setInviteEmail] = useState('');
-const [inviteRole, setInviteRole] = useState('Editor');
-const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; permission: string }[]>([]);
 
   const handlePlanSelectChange = (newPlan: 'starter' | 'professional' | 'enterprise') => {
     if (newPlan === 'professional' && brand.plan !== 'professional' && brand.plan !== 'enterprise') {
@@ -97,7 +93,7 @@ const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; per
       ...brand,
       name,
       slogan: slogan || undefined,
-      logoUrl,
+      logoUrl: logoUrl ?? '',
       coverUrl,
       primaryColor,
       secondaryColor,
@@ -113,6 +109,15 @@ const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; per
     setSavedSuccess(true);
     onRefresh();
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleResetSample = () => {
+    if (confirm('Are you sure you want to restore the default "Adeleke Atelier" high-fidelity brand data? Any customized products you added will be replaced.')) {
+      resetToSampleData();
+      onRefresh();
+      alert('Data restored to initial luxury presets.');
+      window.location.reload();
+    }
   };
 
   const handleWipeData = () => {
@@ -200,8 +205,8 @@ const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; per
                     </button>
                   </div>
                 ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-gray-400 shrink-0">
-                    <Image className="w-5 h-5 opacity-60" />
+                  <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center font-display font-bold text-lg text-[#0F5132] shrink-0">
+                    {name ? name.charAt(0).toUpperCase() : 'A'}
                   </div>
                 )}
                 <div className="flex flex-col gap-1 min-w-0 flex-1">
@@ -457,6 +462,13 @@ const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; per
             </p>
 
             <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleResetSample}
+                className="bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 h-8 rounded-full text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3 h-3" /> Reset to Factory Sample Data
+              </button>
 
               <button
                 type="button"
@@ -483,85 +495,23 @@ const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; per
               <p className="text-xs text-gray-400 mt-0.5">Manage permissions and craft assignments for your bespoke boutique team.</p>
             </div>
             <button
-  type="button"
-  onClick={() => setShowInviteModal(true)}
-  className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 h-7 rounded-full text-[10px] font-bold cursor-pointer shrink-0 self-start sm:self-auto transition-all"
->
-  + Invite Crew
-</button>
-{/* Invite Crew Modal */}
-{showInviteModal && (
-  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
-      <h3 className="font-display font-bold text-lg text-gray-900 mb-2">Invite Crew Member</h3>
-      <p className="text-xs text-gray-500 mb-4">Send an invitation to join your atelier team.</p>
-      
-      <div className="flex flex-col gap-3">
-        <div>
-          <label className="text-xs font-bold text-gray-700 block mb-1">Email Address</label>
-          <input
-            type="email"
-            placeholder="team@brand.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F5132]"
-          />
-        </div>
-        
-        <div>
-          <label className="text-xs font-bold text-gray-700 block mb-1">Role</label>
-          <select
-            value={inviteRole}
-            onChange={(e) => setInviteRole(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F5132]"
-          >
-            <option value="Editor">Editor</option>
-            <option value="Viewer">Viewer</option>
-          </select>
-        </div>
-        
-        <div className="flex gap-2 mt-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (inviteEmail.trim()) {
-                const newMember = {
-                  name: inviteEmail.split('@')[0],
-                  role: 'Craft Role',
-                  permission: inviteRole
-                };
-                setTeamMembers([...teamMembers, newMember]);
-                setInviteEmail('');
-                setShowInviteModal(false);
-                alert(`Invitation sent to ${inviteEmail} as ${inviteRole}`);
-              } else {
-                alert('Please enter an email address');
-              }
-            }}
-            className="flex-1 bg-[#0F5132] hover:bg-[#145A32] text-white py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-          >
-            Send Invite
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowInviteModal(false);
-              setInviteEmail('');
-            }}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+              type="button"
+              onClick={() => {
+                if (brand.plan === 'starter') {
+                  alert('Starter Plan is limited to 1 team member. Upgrade to Professional (₦25,000/month) for up to 3 team members or Enterprise for unlimited team members.');
+                } else {
+                  alert('Crew invitation link successfully generated! Send link to new team member.');
+                }
+              }}
+              className="bg-[#0F5132] hover:bg-[#145A32] text-white px-4 h-7 rounded-full text-[10px] font-bold cursor-pointer shrink-0 self-start sm:self-auto transition-all"
+            >
+              + Invite Crew
+            </button>
           </div>
 
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 text-center text-xs text-gray-400 font-medium">
-  No team members added yet. Invite your first team member.
-</div>
+          <div className="py-8 text-center bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+            <p className="text-xs font-medium text-gray-500">No team members added yet. Invite your first team member.</p>
+          </div>
         </div>
 
       </div>
