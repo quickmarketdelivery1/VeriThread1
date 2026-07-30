@@ -1227,7 +1227,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
       <ArrowLeft className="w-3.5 h-3.5" /> Back
     </button>
   ) : (
-    <div className="w-1" /> // Spacer
+    <div className="w-1" />
   )}
 
   <div className="flex flex-row items-center gap-2 sm:gap-3">
