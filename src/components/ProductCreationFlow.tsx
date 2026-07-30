@@ -272,32 +272,41 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     }
   };
 
-  // Validation functions
   const validateStep = (step: number) => {
-    const errs: Record<string, string> = {};
+  const errs: Record<string, string> = {};
 
-    if (step === 1) {
-      if (!name.trim()) errs.name = 'Product name is required';
-      if (!sku.trim()) errs.sku = 'SKU is required';
-    } else if (step === 2) {
-      if (!fabric.trim()) errs.fabric = 'Fabric composition details are required';
-      if (!color.trim()) errs.color = 'Color is required';
-    } else if (step === 3) {
-      if (!heroImage.trim()) errs.heroImage = 'A high-resolution hero image URL is required';
-    } else if (step === 4) {
-      if (buyNowType === 'whatsapp' && !buyNowValue) {
-        errs.buyNowValue = 'WhatsApp contact phone is required';
-      } else if (buyNowType === 'instagram' && !buyNowValue) {
-        errs.buyNowValue = 'Instagram handle/profile is required';
-      } else if (buyNowType === 'custom' && !buyNowValue) {
-        errs.buyNowValue = 'Destination URL or coordinate value is required';
-      }
-      // Website channel URL is optional (defaults to brand store URL if blank)
+  if (step === 1) {
+    // ✅ Check if name exists and has content
+    if (!name || name.trim() === '') {
+      errs.name = 'Product name is required';
     }
+    if (!sku || sku.trim() === '') {
+      errs.sku = 'SKU is required';
+    }
+  } else if (step === 2) {
+    if (!fabric || fabric.trim() === '') {
+      errs.fabric = 'Fabric composition details are required';
+    }
+    if (!color || color.trim() === '') {
+      errs.color = 'Color is required';
+    }
+  } else if (step === 3) {
+    if (!heroImage || heroImage.trim() === '') {
+      errs.heroImage = 'A high-resolution hero image URL is required';
+    }
+  } else if (step === 4) {
+    if (buyNowType === 'whatsapp' && (!buyNowValue || buyNowValue.trim() === '')) {
+      errs.buyNowValue = 'WhatsApp contact phone is required';
+    } else if (buyNowType === 'instagram' && (!buyNowValue || buyNowValue.trim() === '')) {
+      errs.buyNowValue = 'Instagram handle/profile is required';
+    } else if (buyNowType === 'custom' && (!buyNowValue || buyNowValue.trim() === '')) {
+      errs.buyNowValue = 'Destination URL or coordinate value is required';
+    }
+  }
 
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  setErrors(errs);
+  return Object.keys(errs).length === 0;
+};
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
