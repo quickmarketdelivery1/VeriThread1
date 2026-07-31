@@ -23,6 +23,7 @@ import DeveloperAdminPage from './components/DeveloperAdminPage';
 import OnboardingGuide from './components/OnboardingGuide';
 import ProBadge from './components/ProBadge';
 import DemoDashboard from './components/DemoDashboard';
+import BrandCollections from './components/BrandCollections';
 
 import { getBrand, initStorage, resetAllData, clearStorage, getHasDevAccess, setHasDevAccess, recordBrandSignup } from './lib/storage';
 import { 
@@ -31,6 +32,7 @@ import {
   signOutUser, 
   syncBrandInFirestore,
   getUserFirestoreDoc,
+  saveProductFirestore,
   fetchProductsFirestore,
   fetchCollectionsFirestore,
   fetchQRCodesFirestore,
@@ -112,25 +114,100 @@ export default function App() {
           fetchAnalyticsEventsFirestore(userBrand.id)
         ]);
 
-        // Preserve locally created items if Firestore returns empty array to prevent data loss on refresh
-        let currentLocalProducts: any[] = [];
+        // Retrieve local storage versions for non-destructive two-way merging
+        let localProducts: any[] = [];
+        let localCollections: any[] = [];
+        let localQRCodes: any[] = [];
+        let localCustomers: any[] = [];
+        let localOwnerships: any[] = [];
+        let localAnalytics: any[] = [];
+
         try {
           const lp = localStorage.getItem('vt_products');
-          if (lp) currentLocalProducts = JSON.parse(lp);
+          if (lp) localProducts = JSON.parse(lp);
+        } catch (e) {}
+        try {
+          const lc = localStorage.getItem('vt_collections');
+          if (lc) localCollections = JSON.parse(lc);
+        } catch (e) {}
+        try {
+          const lq = localStorage.getItem('vt_qrcodes');
+          if (lq) localQRCodes = JSON.parse(lq);
+        } catch (e) {}
+        try {
+          const lcu = localStorage.getItem('vt_customers');
+          if (lcu) localCustomers = JSON.parse(lcu);
+        } catch (e) {}
+        try {
+          const lo = localStorage.getItem('vt_ownerships');
+          if (lo) localOwnerships = JSON.parse(lo);
+        } catch (e) {}
+        try {
+          const la = localStorage.getItem('vt_analytics');
+          if (la) localAnalytics = JSON.parse(la);
         } catch (e) {}
 
-        const finalProducts = fsProducts.length > 0 
-          ? fsProducts 
-          : (currentLocalProducts.length > 0 ? currentLocalProducts : []);
+        // Non-destructive merge helper: preserves locally added/edited items not yet returned by Firestore
+        const mergeDataLists = <T extends { id: string; updatedAt?: string }>(localList: T[], fsList: T[]): T[] => {
+          const map = new Map<string, T>();
+          if (Array.isArray(localList)) {
+            for (const item of localList) {
+              if (item && item.id) {
+                map.set(item.id, item);
+              }
+            }
+          }
+          if (Array.isArray(fsList)) {
+            for (const item of fsList) {
+              if (item && item.id) {
+                const existing = map.get(item.id);
+                if (!existing) {
+                  map.set(item.id, item);
+                } else {
+                  const localTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+                  const fsTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+                  if (fsTime > localTime) {
+                    map.set(item.id, item);
+                  } else {
+                    map.set(item.id, { ...item, ...existing });
+                  }
+                }
+              }
+            }
+          }
+          return Array.from(map.values());
+        };
+
+        const finalProducts = mergeDataLists(localProducts, fsProducts);
+        const finalCollections = mergeDataLists(localCollections, fsCollections);
+        const finalQRCodes = mergeDataLists(localQRCodes, fsQRCodes);
+        const finalCustomers = mergeDataLists(localCustomers, fsCustomers);
+        const finalOwnerships = mergeDataLists(localOwnerships, fsOwnerships);
+        const finalAnalytics = mergeDataLists(localAnalytics, fsAnalytics);
 
         // Save real user data in localStorage session
         localStorage.setItem('vt_brand', JSON.stringify(userBrand));
         localStorage.setItem('vt_products', JSON.stringify(finalProducts));
-        localStorage.setItem('vt_collections', JSON.stringify(fsCollections));
-        localStorage.setItem('vt_qrcodes', JSON.stringify(fsQRCodes));
-        localStorage.setItem('vt_customers', JSON.stringify(fsCustomers));
-        localStorage.setItem('vt_ownerships', JSON.stringify(fsOwnerships));
-        localStorage.setItem('vt_analytics', JSON.stringify(fsAnalytics));
+        localStorage.setItem('vt_collections', JSON.stringify(finalCollections));
+        localStorage.setItem('vt_qrcodes', JSON.stringify(finalQRCodes));
+        localStorage.setItem('vt_customers', JSON.stringify(finalCustomers));
+        localStorage.setItem('vt_ownerships', JSON.stringify(finalOwnerships));
+        localStorage.setItem('vt_analytics', JSON.stringify(finalAnalytics));
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+        }
+
+        // Background sync: push any local products that were missing in Firestore back to Firestore
+        for (const prod of finalProducts) {
+          const isInFirestore = fsProducts.some(f => f.id === prod.id);
+          if (!isInFirestore) {
+            const productWithBrand = { ...prod, brandId: userBrand.id };
+            saveProductFirestore(productWithBrand).catch(err => 
+              console.warn('[App] Background sync local product to Firestore:', err)
+            );
+          }
+        }
 
         setBrand(userBrand);
 
@@ -187,6 +264,8 @@ export default function App() {
 
       if (cleanHash.startsWith('#/passport/')) {
         setCurrentRoute(cleanHash.slice(2)); // 'passport/:id'
+      } else if (cleanHash === '#/brand/collections' || cleanHash.startsWith('#/brand/collections')) {
+        setCurrentRoute('brand/collections');
       } else if (cleanHash === '#/dashboard' && user) {
         setCurrentRoute('dashboard');
       } else if (cleanHash === '#/products' && user) {
@@ -384,7 +463,12 @@ export default function App() {
     return <DigitalPassport productId={productId} onNavigate={navigateTo} />;
   }
 
-  // 1b. PUBLIC DEMO DASHBOARD ROUTE
+  // 1b. PUBLIC BRAND COLLECTIONS ROUTE
+  if (currentRoute === 'brand/collections' || currentRoute.startsWith('brand/collections')) {
+    return <BrandCollections onNavigate={navigateTo} />;
+  }
+
+  // 1c. PUBLIC DEMO DASHBOARD ROUTE
   if (currentRoute === 'demo') {
     return <DemoDashboard onNavigate={navigateTo} />;
   }

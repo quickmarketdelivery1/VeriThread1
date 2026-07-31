@@ -413,8 +413,13 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
       console.log('[ProductCreationFlow] Saving product to localStorage:', newProduct);
       saveProduct(newProduct);
 
-      console.log('[ProductCreationFlow] Syncing product to Firestore:', newProduct.id);
-      await saveProductFirestore(newProduct);
+      // Attempt background Firestore sync safely without blocking success UI
+      try {
+        console.log('[ProductCreationFlow] Syncing product to Firestore:', newProduct.id);
+        await saveProductFirestore(newProduct);
+      } catch (fsErr) {
+        console.warn('[ProductCreationFlow] Firestore background sync notice:', fsErr);
+      }
 
       console.log('[ProductCreationFlow] Product certified & saved successfully:', uniqueId);
       setCreatedProductId(uniqueId);
@@ -1279,15 +1284,12 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         )}
 
         {/* Navigation Buttons Row */}
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-3 w-full">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between border-t border-gray-150 pt-5 mt-6 sm:mt-8 gap-3 w-full pb-10 sm:pb-0 relative z-20">
           {currentStep > 1 ? (
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                handleBack();
-              }}
-              className="px-4 py-3 sm:py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 sm:bg-transparent hover:bg-gray-100 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1.5 min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+              onClick={() => handleBack()}
+              className="px-4 py-3 sm:py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 sm:bg-transparent hover:bg-gray-100 rounded-full cursor-pointer transition-all flex items-center justify-center gap-1.5 min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto active:scale-[0.98]"
             >
               <ArrowLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Back
             </button>
@@ -1295,26 +1297,26 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
             <div className="w-1 hidden sm:block" />
           )}
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto relative z-20">
             {currentStep === 5 ? (
               <>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
+                    console.log('[ProductCreationFlow] Mobile/Desktop Save Draft clicked');
                     handlePublish(false);
                   }}
-                  className="px-4 py-3 sm:py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto bg-white"
+                  className="px-4 py-3 sm:py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto bg-white active:scale-[0.98]"
                 >
                   Save Draft
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
+                    console.log('[ProductCreationFlow] Mobile/Desktop Certify & Publish clicked');
                     handlePublish(true);
                   }}
-                  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+                  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto relative z-30 select-none active:scale-[0.98]"
                 >
                   <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Certify & Publish
                 </button>
@@ -1322,11 +1324,8 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
             ) : (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNext();
-                }}
-                className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto"
+                onClick={() => handleNext()}
+                className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto relative z-30 select-none active:scale-[0.98]"
               >
                 Next Step <ArrowRight className="w-3.5 h-3.5" />
               </button>

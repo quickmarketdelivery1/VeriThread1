@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, MessageSquare, Award, Clock, FileText, ChevronRight, ChevronLeft, Share2, 
   CheckCircle, ExternalLink, X, Globe, Heart, ArrowLeft, Thermometer, Sparkles, 
-  Compass, Droplets, Waves, Clipboard, Calendar, Tag, MapPin, Users, HelpCircle 
+  Compass, Droplets, Waves, Clipboard, Calendar, Tag, MapPin, Users, HelpCircle, Flag
 } from 'lucide-react';
 import { Product, Brand, Ownership, Customer } from '../types';
-import { getProductById, getBrand, registerWarranty, getOwnerships, recordQRCodeScan, getProducts, isProductLiked, toggleProductLike, getCustomers } from '../lib/storage';
+import { getProductById, getBrand, registerWarranty, getOwnerships, recordQRCodeScan, getProducts, getProductsByBrand, isProductLiked, toggleProductLike, getCustomers } from '../lib/storage';
 import { fetchProductByIdFirestore } from '../lib/firebase';
 import ProBadge from './ProBadge';
 import WarrantyTracker from './WarrantyTracker';
 import OwnershipRegistration from './OwnershipRegistration';
+import ReportBrandModal from './ReportBrandModal';
 
 interface DigitalPassportProps {
   productId: string;
@@ -21,6 +22,8 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
   const [remoteProduct, setRemoteProduct] = useState<Product | null>(null);
   const product = localProduct || remoteProduct;
   const brand = getBrand();
+  const brandName = brand.name?.trim() || 'Verified Atelier';
+  const brandLocation = brand.location?.trim() || 'Atelier Workshop';
 
   useEffect(() => {
     if (!localProduct && productId) {
@@ -33,6 +36,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
   const [activeTab, setActiveTab] = useState<'story' | 'details' | 'authenticity' | 'warranty'>('story');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(() => product ? isProductLiked(product.id) : false);
   const [likeCount, setLikeCount] = useState(() => product?.likeCount || 0);
   const [viewerRole, setViewerRole] = useState<'owner' | 'guest'>('owner');
@@ -58,7 +62,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
     ? ownerships.find(o => o.productId === product.id)
     : null;
 
-  const otherProducts = getProducts().filter(p => p.id !== product?.id && p.isPublished !== false);
+  const otherProducts = getProductsByBrand(brand.id).filter(p => p.id !== product?.id && p.isPublished !== false);
 
   const allImages = product ? [product.heroImage, ...(product.galleryImages || [])].filter(img => img && img.trim() !== '') : [];
 
@@ -144,7 +148,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
 
   // Get Storefront website URL
   const getWebsiteUrl = () => {
-    const raw = product.buyNowValue?.trim() || brand.websiteUrl?.trim() || brand.defaultBuyNowUrl?.trim() || 'https://adeleke-atelier.com';
+    const raw = product.buyNowValue?.trim() || brand.websiteUrl?.trim() || brand.defaultBuyNowUrl?.trim() || '';
     if (!raw) return '#';
     return raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
   };
@@ -288,15 +292,17 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-emerald-900 border-2 border-white shadow-lg flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
-                  {brand.name ? brand.name.charAt(0).toUpperCase() : 'V'}
+                  {brandName.charAt(0).toUpperCase()}
                 </div>
               )}
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">{brand.name}</span>
+                  <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">{brandName}</span>
                   <ProBadge plan={brand.plan} size={20} />
                 </div>
-                <span className="text-[9px] text-emerald-400 font-bold block mt-0.5 uppercase tracking-wider">Lagos Workshop Origin</span>
+                <span className="text-[9px] text-emerald-400 font-bold block mt-0.5 uppercase tracking-wider">
+                  {brandLocation.toLowerCase().includes('origin') ? brandLocation : `${brandLocation} Origin`}
+                </span>
               </div>
             </div>
 
@@ -304,8 +310,8 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
               {product.name}
             </h1>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[10px] text-gray-300 font-mono tracking-widest">
-                LEDGER REF: VT-{product.id.toUpperCase().substring(0, 10)}
+              <p className="text-[10px] text-gray-300 font-mono tracking-widest truncate">
+                SKU: {product.sku} • LEDGER REF: VT-{product.id.toUpperCase().substring(0, 10)}
               </p>
               <button
                 onClick={handleToggleLike}
@@ -491,7 +497,8 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   { label: 'Base Material', val: product.material },
                   { label: 'Density Class (GSM)', val: product.gsm || 'Medium weight' },
                   { label: 'Color Coordinates', val: product.color },
-                  { label: 'Silhouette Fit', val: product.fit }
+                  { label: 'Silhouette Fit', val: product.fit },
+                  { label: 'Warranty Policy', val: `${product.warrantyPeriod || 12} Months Active` }
                 ].map((spec, i) => (
                   <div key={i} className="bg-gray-50 p-3.5 rounded-2xl border border-gray-100 shadow-sm">
                     <span className="text-[9px] text-gray-400 font-bold uppercase block tracking-wider">{spec.label}</span>
@@ -551,11 +558,15 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   </div>
                   <div className="flex justify-between border-b border-gray-200 pb-2">
                     <span className="uppercase text-gray-400">Batch Code:</span>
-                    <span className="text-gray-800 font-bold">BATCH-NG-{new Date(product.createdAt).getFullYear()}</span>
+                    <span className="text-gray-800 font-bold">BATCH-{(brandName || 'VT').substring(0, 4).toUpperCase()}-{new Date(product.createdAt || Date.now()).getFullYear()}</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-200 pb-2">
                     <span className="uppercase text-gray-400">Crafting Origin:</span>
-                    <span className="text-gray-800 font-bold">Lagos Studio, NG</span>
+                    <span className="text-gray-800 font-bold">{brandLocation}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-2">
+                    <span className="uppercase text-gray-400">Warranty Period:</span>
+                    <span className="text-gray-800 font-bold">{product.warrantyPeriod || 12} Months</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="uppercase text-gray-400">Authorized Seal:</span>
@@ -685,7 +696,133 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           )}
         </div>
 
+        {/* Explore More from Brand Section */}
+        <div className="w-full mt-8 pt-6 border-t border-gray-200/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 className="font-display font-bold text-base sm:text-lg text-gray-900 tracking-tight flex items-center gap-2">
+                <Sparkles className="w-4.5 h-4.5 text-[#0F5132]" /> Explore More from {brandName}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Browse authenticated garments and digital passports issued by this atelier.
+              </p>
+            </div>
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate('brand/collections')}
+                className="self-start sm:self-auto px-4 py-1.5 bg-[#0F5132]/10 hover:bg-[#0F5132]/15 text-[#0F5132] font-semibold text-xs rounded-full border border-[#0F5132]/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 shrink-0"
+              >
+                <span>View All Collection</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {otherProducts.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+              {otherProducts.map(p => (
+                <div
+                  key={p.id}
+                  className="group bg-white rounded-2xl border border-gray-200/90 p-3 shadow-xs hover:shadow-md hover:border-emerald-300 transition-all duration-300 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="aspect-[4/5] rounded-xl overflow-hidden bg-gray-100 mb-2.5 relative">
+                      <img
+                        src={p.heroImage || 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=400'}
+                        alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      {p.category && (
+                        <span className="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          {p.category}
+                        </span>
+                      )}
+                      {p.priceMin && (
+                        <span className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-md text-gray-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs border border-gray-200/50">
+                          ₦{Number(p.priceMin).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-display font-semibold text-xs text-gray-900 group-hover:text-[#0F5132] transition-colors line-clamp-1">
+                      {p.name}
+                    </h4>
+                    <p className="font-mono text-[10px] text-gray-400 mt-0.5 truncate">
+                      SKU: {p.sku}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (onNavigate) {
+                        onNavigate(`passport/${p.id}`);
+                      } else {
+                        window.location.hash = `/passport/${p.id}`;
+                      }
+                    }}
+                    className="mt-3 w-full py-2 text-xs font-semibold text-[#0F5132] bg-emerald-50/80 hover:bg-emerald-100/90 text-center rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 border border-emerald-100 active:scale-[0.98]"
+                  >
+                    <span>View Passport</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-6 sm:p-8 text-center shadow-xs flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#0F5132] flex items-center justify-center mb-1">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-semibold text-gray-800">
+                Exclusive Signature Piece
+              </p>
+              <p className="text-[11px] text-gray-500 max-w-xs leading-relaxed">
+                This brand hasn't published additional public garments to this collection yet. Check back soon for new authenticated releases.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Report Brand link section */}
+        <div className="w-full mt-8 pt-6 border-t border-gray-200/80">
+          <div className="bg-gray-50/90 border border-gray-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0 text-red-600 mt-0.5 sm:mt-0">
+                <Flag className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-800">
+                  Encountered an issue with this garment or brand?
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                  Report counterfeit items, inaccurate descriptions, or fraudulent activity directly to our trust team.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-red-50 text-red-700 hover:text-red-800 border border-red-200/90 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+            >
+              <Flag className="w-3.5 h-3.5 text-red-600" />
+              <span>Report Brand</span>
+            </button>
+          </div>
+        </div>
+
       </div>
+
+      {/* Report Brand Modal */}
+      {product && (
+        <ReportBrandModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          brandId={brand.id}
+          brandName={brandName}
+          productId={product.id}
+          productName={product.name}
+        />
+      )}
 
       {/* Back to admin option */}
       {onNavigate && (

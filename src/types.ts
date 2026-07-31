@@ -157,3 +157,17 @@ export interface BrandSignupRecord {
   hasDevAccess?: boolean;
 }
 
+export interface Report {
+  id: string;
+  brandId: string;
+  brandName: string;
+  productId: string;
+  productName: string;
+  reason: string;
+  details: string;
+  email?: string;
+  imageEvidence?: string;
+  status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  createdAt: string;
+}
+

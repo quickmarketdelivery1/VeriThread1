@@ -1,4 +1,4 @@
-import { Brand, Collection, Product, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, BrandSignupRecord } from '../types';
+import { Brand, Collection, Product, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, BrandSignupRecord, Report } from '../types';
 import {
   saveBrandFirestore,
   saveProductFirestore,
@@ -28,7 +28,8 @@ const KEYS = {
   OWNERSHIPS: 'vt_ownerships',
   ANALYTICS: 'vt_analytics',
   CAMPAIGNS: 'vt_campaigns',
-  BRAND_SIGNUPS: 'vt_brand_signups'
+  BRAND_SIGNUPS: 'vt_brand_signups',
+  REPORTS: 'vt_reports'
 };
 
 export const sampleBrandSignups: BrandSignupRecord[] = [];
@@ -311,6 +312,21 @@ export function getProducts(): Product[] {
     }
   }
   return isUserRegisteredSession() ? [] : sampleProducts;
+}
+
+export function getProductsByBrand(brandId?: string): Product[] {
+  const products = getProducts();
+  const targetBrandId = brandId || getBrand().id;
+  return products.filter(p => !targetBrandId || p.brandId === targetBrandId || (!p.brandId && targetBrandId === getBrand().id));
+}
+
+export function getCollectionsWithProducts(brandId?: string): (Collection & { products: Product[] })[] {
+  const collections = getCollections();
+  const products = getProductsByBrand(brandId);
+  return collections.map(col => ({
+    ...col,
+    products: products.filter(p => p.collectionId === col.id)
+  }));
 }
 
 export function getProductById(id: string): Product | undefined {
@@ -921,3 +937,29 @@ export function checkCoupon(code: string): CouponItem | null {
 export function isValidCoupon(code: string): boolean {
   return checkCoupon(code) !== null;
 }
+
+export function getReports(): Report[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem(KEYS.REPORTS);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error('Error reading reports from localStorage', e);
+    return [];
+  }
+}
+
+export function saveReport(report: Report): Report[] {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === report.id);
+  if (index >= 0) {
+    reports[index] = report;
+  } else {
+    reports.unshift(report);
+  }
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEYS.REPORTS, JSON.stringify(reports));
+  }
+  return reports;
+}
+

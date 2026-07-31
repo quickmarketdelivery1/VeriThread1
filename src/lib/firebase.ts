@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, Firestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { Brand, Product, Collection as CollectionType, QRCode, Customer, Ownership, AnalyticsEvent, Campaign } from '../types';
+import { Brand, Product, Collection as CollectionType, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, Report } from '../types';
 
 // Firebase Config with environment variables or safe fallbacks
 const firebaseConfig = {
@@ -477,6 +477,9 @@ export async function fetchProductsFirestore(brandId: string): Promise<Product[]
   }
 }
 
+export const fetchProductsByBrandFirestore = fetchProductsFirestore;
+export const fetchCollectionsByBrandFirestore = fetchCollectionsFirestore;
+
 export async function fetchProductByIdFirestore(productId: string): Promise<Product | null> {
   try {
     const docSnap = await getDoc(doc(db, 'products', productId));
@@ -586,6 +589,26 @@ export async function fetchAnalyticsEventsFirestore(brandId: string): Promise<An
     return [];
   }
 }
+
+export async function saveReportFirestore(report: Report): Promise<void> {
+  try {
+    await setDoc(doc(db, 'reports', report.id), report, { merge: true });
+  } catch (e) {
+    console.warn('Firestore saveReport error:', e);
+  }
+}
+
+export async function fetchReportsFirestore(brandId: string): Promise<Report[]> {
+  try {
+    const q = query(collection(db, 'reports'), where('brandId', '==', brandId));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as Report);
+  } catch (e) {
+    console.warn('Firestore fetchReports warning:', e);
+    return [];
+  }
+}
+
 
 export { onAuthStateChanged };
 
