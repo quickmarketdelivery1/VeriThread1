@@ -28,7 +28,16 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
   useEffect(() => {
     if (!localProduct && productId) {
       fetchProductByIdFirestore(productId).then(p => {
-        if (p) setRemoteProduct(p);
+        if (p) {
+          setRemoteProduct(p);
+          try {
+            const list = getProducts();
+            if (!list.some(item => item.id === p.id)) {
+              list.push(p);
+              localStorage.setItem('vt_products', JSON.stringify(list));
+            }
+          } catch (e) {}
+        }
       });
     }
   }, [productId, localProduct]);

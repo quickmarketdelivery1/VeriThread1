@@ -25,7 +25,7 @@ import ProBadge from './components/ProBadge';
 import DemoDashboard from './components/DemoDashboard';
 import BrandCollections from './components/BrandCollections';
 
-import { getBrand, initStorage, resetAllData, clearStorage, getHasDevAccess, setHasDevAccess, recordBrandSignup } from './lib/storage';
+import { getBrand, initStorage, resetAllData, clearStorage, getHasDevAccess, setHasDevAccess, recordBrandSignup, syncProductsWithRemote } from './lib/storage';
 import { 
   auth, 
   onAuthStateChanged, 
@@ -178,7 +178,7 @@ export default function App() {
           return Array.from(map.values());
         };
 
-        const finalProducts = mergeDataLists(localProducts, fsProducts);
+        const finalProducts = syncProductsWithRemote(fsProducts, userBrand.id);
         const finalCollections = mergeDataLists(localCollections, fsCollections);
         const finalQRCodes = mergeDataLists(localQRCodes, fsQRCodes);
         const finalCustomers = mergeDataLists(localCustomers, fsCustomers);
@@ -196,17 +196,6 @@ export default function App() {
 
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('storage'));
-        }
-
-        // Background sync: push any local products that were missing in Firestore back to Firestore
-        for (const prod of finalProducts) {
-          const isInFirestore = fsProducts.some(f => f.id === prod.id);
-          if (!isInFirestore) {
-            const productWithBrand = { ...prod, brandId: userBrand.id };
-            saveProductFirestore(productWithBrand).catch(err => 
-              console.warn('[App] Background sync local product to Firestore:', err)
-            );
-          }
         }
 
         setBrand(userBrand);

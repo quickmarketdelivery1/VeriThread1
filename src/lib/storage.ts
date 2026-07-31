@@ -334,18 +334,91 @@ export function getProductById(id: string): Product | undefined {
   return products.find(p => p.id === id);
 }
 
+export function syncProductsWithRemote(fsProducts: Product[], brandId: string): Product[] {
+  if (!Array.isArray(fsProducts)) return getProducts();
+
+  const currentLocal = getProducts();
+  const fsMap = new Map<string, Product>();
+  fsProducts.forEach(p => {
+    if (p && p.id) fsMap.set(p.id, p);
+  });
+
+  // Keep products for other brands intact
+  const otherBrandProds = currentLocal.filter(
+    p => p.brandId && p.brandId !== brandId && p.brandId !== 'brand-1' && p.brandId !== 'brand-sample'
+  );
+
+  const updatedBrandProds: Product[] = [];
+
+  // 1. Process items present in Firestore
+  fsProducts.forEach(fp => {
+    const local = currentLocal.find(l => l.id === fp.id);
+    if (!local) {
+      updatedBrandProds.push(fp);
+    } else {
+      const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+      const fsTime = fp.updatedAt ? new Date(fp.updatedAt).getTime() : 0;
+      if (fsTime >= localTime) {
+        updatedBrandProds.push(fp);
+      } else {
+        updatedBrandProds.push({ ...fp, ...local });
+      }
+    }
+  });
+
+  // 2. Process local items for this brand not in Firestore
+  const now = Date.now();
+  currentLocal.forEach(lp => {
+    const isThisBrand = lp.brandId === brandId || !lp.brandId || lp.brandId === 'brand-1' || lp.brandId === 'brand-sample';
+    if (isThisBrand && !fsMap.has(lp.id)) {
+      const createdTime = lp.createdAt ? new Date(lp.createdAt).getTime() : 0;
+      // If created within the last 3 minutes, it might be pending initial sync
+      if (createdTime > 0 && now - createdTime < 3 * 60 * 1000) {
+        const fixedProduct = { ...lp, brandId };
+        updatedBrandProds.push(fixedProduct);
+        saveProductFirestore(fixedProduct).catch(e => console.warn('[Storage] Background push local pending product to Firestore:', e));
+      }
+      // Otherwise it was deleted on Firestore so omit it (deletion propagation)
+    }
+  });
+
+  const finalCombined = [...updatedBrandProds, ...otherBrandProds];
+  try {
+    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(finalCombined));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (e) {
+    console.warn('[Storage] Error saving synced products to localStorage:', e);
+  }
+
+  return finalCombined;
+}
+
 export function saveProduct(product: Product): Product[] {
   console.log('[Storage] saveProduct called for product:', product.name, 'ID:', product.id);
   if (isPreviewModeReadOnly()) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return getProducts();
   }
+  
+  // Get active brand ID (prefer authed user UID if available)
   const brand = getBrand();
+  let effectiveBrandId = brand.id;
+  try {
+    const authUser = localStorage.getItem('vt_auth_user');
+    if (authUser) {
+      const parsed = JSON.parse(authUser);
+      if (parsed.uid) effectiveBrandId = parsed.uid;
+    }
+  } catch (e) {}
+
   const productWithBrand: Product = { 
     ...product, 
-    brandId: product.brandId || brand.id || 'brand-1',
+    brandId: product.brandId || effectiveBrandId || brand.id || 'brand-1',
     updatedAt: new Date().toISOString()
   };
+
   const list = getProducts();
   const index = list.findIndex(p => p.id === productWithBrand.id);
   if (index >= 0) {
@@ -353,6 +426,7 @@ export function saveProduct(product: Product): Product[] {
   } else {
     list.unshift(productWithBrand);
   }
+
   try {
     localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(list));
     console.log('[Storage] Product successfully saved to localStorage. Total products:', list.length);
@@ -363,7 +437,10 @@ export function saveProduct(product: Product): Product[] {
     console.error('[Storage] Error writing product to localStorage:', e);
   }
 
-  saveProductFirestore(productWithBrand).catch(err => console.warn('[Storage] Firestore sync product warning:', err));
+  // Mandatory Firestore persistence
+  saveProductFirestore(productWithBrand).catch(err => 
+    console.warn('[Storage] Firestore sync product warning:', err)
+  );
 
   // Also ensure a QR Code exists for this product
   try {
@@ -376,14 +453,27 @@ export function saveProduct(product: Product): Product[] {
 }
 
 export function deleteProduct(id: string) {
+  console.log('[Storage] deleteProduct called for product ID:', id);
   if (isPreviewModeReadOnly()) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return;
   }
   const list = getProducts();
   const filtered = list.filter(p => p.id !== id);
-  localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(filtered));
-  deleteProductFirestore(id).catch(err => console.warn('Firestore delete product warning:', err));
+  try {
+    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(filtered));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  } catch (e) {
+    console.error('[Storage] Error removing product from localStorage:', e);
+  }
+
+  deleteProductFirestore(id).then(() => {
+    console.log('[Storage] deleteProductFirestore completed for ID:', id);
+  }).catch(err => {
+    console.warn('[Storage] Firestore delete product warning:', err);
+  });
 }
 
 

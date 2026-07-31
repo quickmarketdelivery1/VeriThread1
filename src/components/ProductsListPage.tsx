@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Grid, List, QrCode, Globe, Eye, Trash2, ArrowUpRight, Heart } from 'lucide-react';
+import { Plus, Search, Filter, Grid, List, QrCode, Globe, Eye, Trash2, ArrowUpRight, Heart, RefreshCw } from 'lucide-react';
 import { Product } from '../types';
-import { getProducts, getQRCodes, getOwnerships, deleteProduct, getBrand } from '../lib/storage';
+import { getProducts, getQRCodes, getOwnerships, deleteProduct, getBrand, syncProductsWithRemote } from '../lib/storage';
+import { fetchProductsFirestore } from '../lib/firebase';
 import ProBadge from './ProBadge';
 
 interface ProductsListPageProps {
@@ -12,11 +13,39 @@ interface ProductsListPageProps {
 export default function ProductsListPage({ onNavigate, onRefresh }: ProductsListPageProps) {
   const brand = getBrand();
   const [products, setProducts] = useState<Product[]>(() => getProducts());
+  const [isSyncing, setIsSyncing] = useState(false);
   const qrcodes = getQRCodes();
   const ownerships = getOwnerships();
 
+  const syncFirestoreData = async () => {
+    let activeBrandId = brand.id;
+    try {
+      const authUserStr = localStorage.getItem('vt_auth_user');
+      if (authUserStr) {
+        const u = JSON.parse(authUserStr);
+        if (u.uid) activeBrandId = u.uid;
+      }
+    } catch (e) {}
+
+    if (activeBrandId) {
+      setIsSyncing(true);
+      try {
+        const remoteProds = await fetchProductsFirestore(activeBrandId);
+        if (remoteProds) {
+          const synced = syncProductsWithRemote(remoteProds, activeBrandId);
+          setProducts(synced);
+        }
+      } catch (e) {
+        console.warn('[ProductsListPage] Remote sync notice:', e);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
   useEffect(() => {
     setProducts(getProducts());
+    syncFirestoreData();
   }, []);
 
   useEffect(() => {
