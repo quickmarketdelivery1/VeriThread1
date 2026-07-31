@@ -5,6 +5,64 @@ import { getCollections, saveProduct, getProducts, getBrand, saveBrand, incremen
 import { saveProductFirestore } from '../lib/firebase';
 import { generateProductStory, generateCareInstructions, generateProductTags, getPremiumHelp } from '../lib/ai';
 
+// Client-side image compression helper to prevent mobile canvas freeze & localStorage quota errors
+export function compressImage(
+  file: File,
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // If file size is already under 200KB, read directly
+    if (file.size < 200 * 1024) {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => {
+        resolve(e.target?.result as string);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 interface ProductCreationFlowProps {
   onNavigate: (route: string) => void;
   onRefresh: () => void;
@@ -39,6 +97,8 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
   const [currentStep, setCurrentStep] = useState(1);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdProductId, setCreatedProductId] = useState('');
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Step 1: Basic Info
   const [name, setName] = useState('');
@@ -219,39 +279,41 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     { name: 'Bespoke Tan Linen Suite', url: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800' }
   ];
 
-  const handleFileChange = (file: File) => {
+  const handleFileChange = async (file: File) => {
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          const updated = [...galleryImages];
-          let targetIndex = selectedSlotIndex;
-          
-          if (fileInputSlotIndexRef.current !== null) {
-            targetIndex = fileInputSlotIndexRef.current;
+      setIsUploadingImage(true);
+      try {
+        const compressedBase64 = await compressImage(file, 1200, 1200, 0.82);
+        const updated = [...galleryImages];
+        let targetIndex = selectedSlotIndex;
+        
+        if (fileInputSlotIndexRef.current !== null) {
+          targetIndex = fileInputSlotIndexRef.current;
+        } else {
+          // Find next available slot index
+          const defaultPreset = 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800';
+          if (galleryImages[0] === defaultPreset) {
+            targetIndex = 0;
           } else {
-            // Find next available slot index
-            const defaultPreset = 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800';
-            if (galleryImages[0] === defaultPreset) {
-              targetIndex = 0;
+            const firstEmptyIndex = galleryImages.findIndex(img => !img || img.trim() === '');
+            if (firstEmptyIndex !== -1) {
+              targetIndex = firstEmptyIndex;
             } else {
-              const firstEmptyIndex = galleryImages.findIndex(img => !img || img.trim() === '');
-              if (firstEmptyIndex !== -1) {
-                targetIndex = firstEmptyIndex;
-              } else {
-                targetIndex = selectedSlotIndex; // fallback to selected
-              }
+              targetIndex = selectedSlotIndex; // fallback to selected
             }
           }
-          
-          updated[targetIndex] = e.target.result as string;
-          setGalleryImages(updated);
-          setSelectedSlotIndex(targetIndex);
-          // Reset the slot index ref so subsequent uploads behave normally
-          fileInputSlotIndexRef.current = null;
         }
-      };
-      reader.readAsDataURL(file);
+        
+        updated[targetIndex] = compressedBase64;
+        setGalleryImages(updated);
+        setSelectedSlotIndex(targetIndex);
+        fileInputSlotIndexRef.current = null;
+      } catch (err) {
+        console.error('[ProductCreationFlow] Error processing image:', err);
+        alert('Could not process image file. Please try selecting a smaller JPEG or PNG image.');
+      } finally {
+        setIsUploadingImage(false);
+      }
     }
   };
 
@@ -347,12 +409,15 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
   };
 
   const handlePublish = async (isPublishing: boolean) => {
+    if (isSubmittingProduct) return;
     console.log('[ProductCreationFlow] handlePublish initiated. isPublishing:', isPublishing);
 
     if (!validateAllSteps()) {
       console.warn('[ProductCreationFlow] Validation failed in handlePublish');
       return;
     }
+
+    setIsSubmittingProduct(true);
 
     try {
       // 1. Strict limit check on active publication
@@ -365,6 +430,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
           description: qrResult.message || `You have reached the monthly limit of active QR passport certifications for the ${freshBrand.plan.toUpperCase()} tier.`
         });
         setShowUpgradeModal(true);
+        setIsSubmittingProduct(false);
         return;
       }
 
@@ -413,13 +479,10 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
       console.log('[ProductCreationFlow] Saving product to localStorage:', newProduct);
       saveProduct(newProduct);
 
-      // Attempt background Firestore sync safely without blocking success UI
-      try {
-        console.log('[ProductCreationFlow] Syncing product to Firestore:', newProduct.id);
-        await saveProductFirestore(newProduct);
-      } catch (fsErr) {
+      // Background Firestore sync safely without blocking success UI
+      saveProductFirestore(newProduct).catch(fsErr => {
         console.warn('[ProductCreationFlow] Firestore background sync notice:', fsErr);
-      }
+      });
 
       console.log('[ProductCreationFlow] Product certified & saved successfully:', uniqueId);
       setCreatedProductId(uniqueId);
@@ -432,6 +495,8 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     } catch (err: any) {
       console.error("[ProductCreationFlow] Error publishing product:", err);
       alert("Could not certify product passport. Please check required fields and try again.");
+    } finally {
+      setIsSubmittingProduct(false);
     }
   };
 
@@ -993,19 +1058,26 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleFileChange(e.target.files[0]);
+                          e.target.value = '';
                         }
                       }}
                       className="hidden"
                     />
                     <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#0F5132] flex items-center justify-center">
-                      <Upload className="w-5 h-5 animate-bounce" style={{ animationDuration: '3s' }} />
+                      {isUploadingImage ? (
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Upload className="w-5 h-5 animate-bounce" style={{ animationDuration: '3s' }} />
+                      )}
                     </div>
                     <div className="text-center">
                       <p className="text-xs font-bold text-gray-800">
-                        ⚡ Quick Fast Upload Zone
+                        {isUploadingImage ? '⚡ Optimizing & Compressing Image...' : '⚡ Quick Fast Upload Zone'}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-1">
-                        Click here or drop a file to <span className="text-[#0F5132] font-extrabold underline">automatically fill the next available slot</span>!
+                        {isUploadingImage
+                          ? 'Auto-scaling high-res phone photo to lightweight 1200px web format...'
+                          : 'Click here or drop a file to automatically fill the next available slot!'}
                       </p>
                       <p className="text-[10px] text-gray-400 mt-1.5 font-medium">
                         PNG, JPG, JPEG, or WEBP (Direct auto-flow, no manual slot picking needed)
@@ -1302,23 +1374,34 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
               <>
                 <button
                   type="button"
+                  disabled={isSubmittingProduct}
                   onClick={() => {
                     console.log('[ProductCreationFlow] Mobile/Desktop Save Draft clicked');
                     handlePublish(false);
                   }}
-                  className="px-4 py-3 sm:py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto bg-white active:scale-[0.98]"
+                  className="px-4 py-3 sm:py-2.5 border border-gray-200 hover:border-gray-400 text-gray-700 hover:text-gray-900 rounded-full text-xs font-medium cursor-pointer transition-all flex items-center justify-center whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto bg-white active:scale-[0.98] disabled:opacity-50"
                 >
                   Save Draft
                 </button>
                 <button
                   type="button"
+                  disabled={isSubmittingProduct}
                   onClick={() => {
                     console.log('[ProductCreationFlow] Mobile/Desktop Certify & Publish clicked');
                     handlePublish(true);
                   }}
-                  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto relative z-30 select-none active:scale-[0.98]"
+                  className="bg-[#0F5132] hover:bg-[#145A32] active:bg-[#0B3D26] text-white px-5 py-3 sm:py-2.5 rounded-full text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all whitespace-nowrap min-h-[48px] sm:min-h-[44px] touch-manipulation w-full sm:w-auto relative z-30 select-none active:scale-[0.98] disabled:opacity-50"
                 >
-                  <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Certify & Publish
+                  {isSubmittingProduct ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin" />
+                      Certifying Passport...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Certify & Publish
+                    </>
+                  )}
                 </button>
               </>
             ) : (
