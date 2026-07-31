@@ -20,7 +20,9 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
 
   // Compute metrics dynamically
   const totalProducts = products.length;
-  const totalScans = qrcodes.reduce((acc, q) => acc + q.scanCount, 0);
+  const totalQRScans = qrcodes.reduce((acc, q) => acc + (q.scanCount || 0), 0);
+  const totalScanEvents = activities.filter(e => e.eventType === 'scan').length;
+  const totalScans = Math.max(totalQRScans, totalScanEvents);
   const totalOwners = ownerships.length;
   const totalLikes = products.reduce((acc, p) => acc + (p.likeCount || 0), 0);
   const regRate = totalScans > 0 ? Math.round((totalOwners / totalScans) * 100) : 0;

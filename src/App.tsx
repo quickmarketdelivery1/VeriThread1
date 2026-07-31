@@ -32,13 +32,16 @@ import {
   signOutUser, 
   syncBrandInFirestore,
   getUserFirestoreDoc,
+  saveUserProfileFirestore,
   saveProductFirestore,
   fetchProductsFirestore,
   fetchCollectionsFirestore,
   fetchQRCodesFirestore,
   fetchCustomersFirestore,
   fetchOwnershipsFirestore,
-  fetchAnalyticsEventsFirestore
+  fetchAnalyticsEventsFirestore,
+  saveQRCodeFirestore,
+  saveAnalyticsEventFirestore
 } from './lib/firebase';
 
 export default function App() {
@@ -178,12 +181,59 @@ export default function App() {
           return Array.from(map.values());
         };
 
+        const mergeQRCodes = (localList: any[], fsList: any[], brandId: string): any[] => {
+          const map = new Map<string, any>();
+          if (Array.isArray(localList)) {
+            for (const q of localList) {
+              if (q && q.id) map.set(q.id, { ...q });
+            }
+          }
+          if (Array.isArray(fsList)) {
+            for (const q of fsList) {
+              if (q && q.id) {
+                const existing = map.get(q.id);
+                if (!existing) {
+                  map.set(q.id, { ...q });
+                } else {
+                  const maxScanCount = Math.max(existing.scanCount || 0, q.scanCount || 0);
+                  const merged = { ...existing, ...q, scanCount: maxScanCount };
+                  map.set(q.id, merged);
+                  if (maxScanCount > (q.scanCount || 0)) {
+                    saveQRCodeFirestore(merged, brandId).catch(() => {});
+                  }
+                }
+              }
+            }
+          }
+          return Array.from(map.values());
+        };
+
+        const mergeAnalyticsEvents = (localList: any[], fsList: any[], brandId: string): any[] => {
+          const map = new Map<string, any>();
+          if (Array.isArray(fsList)) {
+            for (const evt of fsList) {
+              if (evt && evt.id) map.set(evt.id, evt);
+            }
+          }
+          if (Array.isArray(localList)) {
+            for (const evt of localList) {
+              if (evt && evt.id) {
+                if (!map.has(evt.id)) {
+                  map.set(evt.id, evt);
+                  saveAnalyticsEventFirestore(evt, brandId).catch(() => {});
+                }
+              }
+            }
+          }
+          return Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        };
+
         const finalProducts = syncProductsWithRemote(fsProducts, userBrand.id);
         const finalCollections = mergeDataLists(localCollections, fsCollections);
-        const finalQRCodes = mergeDataLists(localQRCodes, fsQRCodes);
+        const finalQRCodes = mergeQRCodes(localQRCodes, fsQRCodes, userBrand.id);
         const finalCustomers = mergeDataLists(localCustomers, fsCustomers);
         const finalOwnerships = mergeDataLists(localOwnerships, fsOwnerships);
-        const finalAnalytics = mergeDataLists(localAnalytics, fsAnalytics);
+        const finalAnalytics = mergeAnalyticsEvents(localAnalytics, fsAnalytics, userBrand.id);
 
         // Save real user data in localStorage session
         localStorage.setItem('vt_brand', JSON.stringify(userBrand));
@@ -203,14 +253,34 @@ export default function App() {
         const userHasDevAccess = Boolean(metadata?.hasDevAccess || userBrand.hasDevAccess || getHasDevAccess());
         if (userHasDevAccess) setHasDevAccess(true);
 
-        const fullName = userDoc?.fullName || metadata?.fullName || firebaseUser.displayName || userBrand.name || '';
+        // Strict priority for user display name: Firestore User Doc > Firebase Auth DisplayName > User Brand Name > Local Signup Metadata > Email Username
+        const canonicalFullName = userDoc?.fullName?.trim() || firebaseUser.displayName?.trim() || userBrand.name?.trim() || metadata?.fullName?.trim() || email.split('@')[0];
+        const canonicalBrandName = userBrand.name?.trim() || userDoc?.brandName?.trim() || metadata?.brandName?.trim() || '';
+
+        // Repair Firestore user doc if missing or out of sync so all devices read the exact same account profile
+        const canonicalDescription = userBrand.description || userDoc?.brandDescription || metadata?.brandDescription || '';
+
+        if (!userDoc || !userDoc.fullName || userDoc.fullName !== canonicalFullName || userDoc.brandDescription !== canonicalDescription) {
+          saveUserProfileFirestore(firebaseUser.uid, {
+            uid: firebaseUser.uid,
+            fullName: canonicalFullName,
+            brandName: canonicalBrandName,
+            brandType: userBrand.type || metadata?.brandType || '',
+            brandDescription: canonicalDescription,
+            brandLocation: userBrand.location || metadata?.brandLocation || '',
+            plan: userBrand.plan || metadata?.plan || 'starter',
+            email: email
+          }).catch(err => console.warn('[App] User profile Firestore sync notice:', err));
+        }
+
         const authedUser = { 
+          uid: firebaseUser.uid,
           email, 
-          fullName, 
-          name: fullName, 
-          brandName: userBrand.name || metadata?.brandName || '', 
+          fullName: canonicalFullName, 
+          name: canonicalFullName, 
+          brandName: canonicalBrandName, 
           brandType: userBrand.type || metadata?.brandType || '',
-          brandDescription: userBrand.description || metadata?.brandDescription || '',
+          brandDescription: canonicalDescription,
           brandLocation: userBrand.location || metadata?.brandLocation || '',
           plan: userBrand.plan || metadata?.plan || 'starter',
           hasDevAccess: userHasDevAccess 
@@ -219,7 +289,7 @@ export default function App() {
         setUser(authedUser);
 
         recordBrandSignup({
-          name: userBrand.name,
+          name: canonicalBrandName || userBrand.name,
           email: email,
           plan: userBrand.plan,
           hasDevAccess: userHasDevAccess,

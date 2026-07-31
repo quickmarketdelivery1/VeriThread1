@@ -1,6 +1,7 @@
 import { Brand, Collection, Product, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, BrandSignupRecord, Report } from '../types';
 import {
   saveBrandFirestore,
+  saveUserProfileFirestore,
   saveProductFirestore,
   deleteProductFirestore,
   saveCollectionFirestore,
@@ -230,7 +231,31 @@ export function saveBrand(brand: Brand) {
     logoUrl: typeof brand.logoUrl === 'string' ? brand.logoUrl : ''
   };
   localStorage.setItem(KEYS.BRAND, JSON.stringify(cleanBrand));
+  
+  try {
+    const authUserStr = localStorage.getItem('vt_auth_user');
+    if (authUserStr) {
+      const parsed = JSON.parse(authUserStr);
+      parsed.brandName = cleanBrand.name;
+      parsed.brandType = cleanBrand.type || parsed.brandType;
+      parsed.brandDescription = cleanBrand.description || parsed.brandDescription;
+      parsed.brandLocation = cleanBrand.location || parsed.brandLocation;
+      parsed.plan = cleanBrand.plan || parsed.plan;
+      localStorage.setItem('vt_auth_user', JSON.stringify(parsed));
+    }
+  } catch (e) {}
+
   saveBrandFirestore(cleanBrand).catch(err => console.warn('Firestore sync brand warning:', err));
+  if (cleanBrand.id) {
+    saveUserProfileFirestore(cleanBrand.id, {
+      brandName: cleanBrand.name,
+      brandType: cleanBrand.type,
+      brandDescription: cleanBrand.description,
+      brandLocation: cleanBrand.location,
+      plan: cleanBrand.plan,
+      email: cleanBrand.supportEmail
+    }).catch(err => console.warn('Firestore sync user profile warning:', err));
+  }
 }
 
 function isUserRegisteredSession(): boolean {
@@ -491,7 +516,11 @@ export function getQRCodes(): QRCode[] {
 }
 
 export function getOrCreateQRCode(productId: string): QRCode {
+  const products = getProducts();
+  const product = products.find(p => p.id === productId);
   const brand = getBrand();
+  const targetBrandId = product?.brandId || brand.id;
+
   const codes = getQRCodes();
   let code = codes.find(q => q.productId === productId);
   if (!code) {
@@ -505,33 +534,57 @@ export function getOrCreateQRCode(productId: string): QRCode {
     };
     codes.push(code);
     localStorage.setItem(KEYS.QRCODES, JSON.stringify(codes));
-    saveQRCodeFirestore(code, brand.id).catch(err => console.warn('Firestore sync qrcode warning:', err));
+    saveQRCodeFirestore(code, targetBrandId).catch(err => console.warn('[Storage] Firestore sync qrcode warning:', err));
   }
   return code;
 }
 
-export function recordQRCodeScan(productId: string) {
+export function recordQRCodeScan(productId: string, explicitBrandId?: string) {
+  const products = getProducts();
+  const product = products.find(p => p.id === productId);
   const brand = getBrand();
-  const codes = getQRCodes();
-  const code = codes.find(q => q.productId === productId);
-  if (code) {
-    code.scanCount += 1;
-    code.updatedAt = new Date().toISOString();
-    localStorage.setItem(KEYS.QRCODES, JSON.stringify(codes));
-    saveQRCodeFirestore(code, brand.id).catch(err => console.warn('Firestore sync qrcode scan warning:', err));
+  const targetBrandId = explicitBrandId || product?.brandId || brand.id;
 
-    // Also record in analytics events
-    recordAnalyticsEvent({
-      id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      productId,
-      eventType: 'scan',
-      timestamp: new Date().toISOString(),
-      metadata: {
-        location: getRandomNigerianCity(),
-        referrer: Math.random() > 0.5 ? 'WhatsApp' : 'Instagram'
-      }
-    });
+  const codes = getQRCodes();
+  let code = codes.find(q => q.productId === productId);
+  if (!code) {
+    code = {
+      id: `qr-${productId}`,
+      productId: productId,
+      code: `https://verithread.net/passport/${productId}`,
+      scanCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    codes.push(code);
   }
+
+  code.scanCount = (code.scanCount || 0) + 1;
+  code.updatedAt = new Date().toISOString();
+  localStorage.setItem(KEYS.QRCODES, JSON.stringify(codes));
+  
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('storage'));
+  }
+
+  // Save to Firestore with canonical targetBrandId
+  saveQRCodeFirestore(code, targetBrandId).catch(err => 
+    console.warn('[Storage] Firestore sync qrcode scan warning:', err)
+  );
+
+  // Record scan analytics event
+  const newEvent: AnalyticsEvent = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    productId,
+    eventType: 'scan',
+    timestamp: new Date().toISOString(),
+    metadata: {
+      location: getRandomNigerianCity(),
+      referrer: Math.random() > 0.5 ? 'WhatsApp' : 'Instagram'
+    }
+  };
+
+  recordAnalyticsEvent(newEvent, targetBrandId);
 }
 
 // Customer & Ownership functions
@@ -565,6 +618,7 @@ export function registerWarranty(productId: string, customerData: { email: strin
   const ownerships = getOwnerships();
   const products = getProducts();
   const product = products.find(p => p.id === productId);
+  const targetBrandId = product?.brandId || brand.id;
 
   if (!product) return { success: false, message: 'Product not found' };
 
@@ -582,7 +636,7 @@ export function registerWarranty(productId: string, customerData: { email: strin
     };
     customers.push(customer);
     localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(customers));
-    saveCustomerFirestore(customer, brand.id).catch(err => console.warn('Firestore sync customer warning:', err));
+    saveCustomerFirestore(customer, targetBrandId).catch(err => console.warn('Firestore sync customer warning:', err));
   }
 
   // Check if already registered
@@ -608,7 +662,7 @@ export function registerWarranty(productId: string, customerData: { email: strin
 
   ownerships.push(ownership);
   localStorage.setItem(KEYS.OWNERSHIPS, JSON.stringify(ownerships));
-  saveOwnershipFirestore(ownership, brand.id).catch(err => console.warn('Firestore sync ownership warning:', err));
+  saveOwnershipFirestore(ownership, targetBrandId).catch(err => console.warn('Firestore sync ownership warning:', err));
 
   // Log in analytics
   recordAnalyticsEvent({
@@ -620,7 +674,7 @@ export function registerWarranty(productId: string, customerData: { email: strin
       location: getRandomNigerianCity(),
       ownerName: `${customer.firstName} ${customer.lastName}`
     }
-  });
+  }, targetBrandId);
 
   return { success: true, message: 'Successfully registered warranty!', ownership, customer };
 }
@@ -638,12 +692,24 @@ export function getAnalyticsEvents(): AnalyticsEvent[] {
   return isUserRegisteredSession() ? [] : sampleAnalyticsEvents;
 }
 
-export function recordAnalyticsEvent(event: AnalyticsEvent) {
+export function recordAnalyticsEvent(event: AnalyticsEvent, explicitBrandId?: string) {
   const brand = getBrand();
+  const products = getProducts();
+  const product = event.productId ? products.find(p => p.id === event.productId) : null;
+  const targetBrandId = explicitBrandId || product?.brandId || brand.id;
+
   const list = getAnalyticsEvents();
-  list.unshift(event); // Put newest first
+  // Avoid duplicate event addition if already present
+  if (!list.some(e => e.id === event.id)) {
+    list.unshift(event); // Put newest first
+  }
   localStorage.setItem(KEYS.ANALYTICS, JSON.stringify(list));
-  saveAnalyticsEventFirestore(event, brand.id).catch(err => console.warn('Firestore sync analytics warning:', err));
+  
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('storage'));
+  }
+
+  saveAnalyticsEventFirestore(event, targetBrandId).catch(err => console.warn('Firestore sync analytics warning:', err));
 }
 
 // Campaign functions

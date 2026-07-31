@@ -248,6 +248,20 @@ export async function loginUser(
 }
 
 /**
+ * Save User Profile Data in Firestore users/{uid}
+ */
+export async function saveUserProfileFirestore(uid: string, profileData: any): Promise<void> {
+  if (!uid) return;
+  try {
+    const cleanData = sanitizeForFirestore(profileData);
+    await setDoc(doc(db, 'users', uid), cleanData, { merge: true });
+    console.log('[Firestore] saveUserProfileFirestore successfully updated user doc for UID:', uid);
+  } catch (e) {
+    console.warn('[Firestore] saveUserProfileFirestore error:', e);
+  }
+}
+
+/**
  * Fetch User Data from Firestore users/{uid}
  */
 export async function getUserFirestoreDoc(uid: string): Promise<any> {
@@ -263,11 +277,12 @@ export async function getUserFirestoreDoc(uid: string): Promise<any> {
     } catch (e) {}
 
     const brandSnap = await getDoc(doc(db, 'brands', uid));
+    let fallbackData: any = null;
     if (brandSnap.exists()) {
       const b = brandSnap.data();
-      return {
+      fallbackData = {
         uid,
-        fullName: meta?.fullName || '',
+        fullName: meta?.fullName || b.name || '',
         brandName: b.name || meta?.brandName || '',
         brandType: b.type || meta?.brandType || '',
         brandDescription: b.description || meta?.brandDescription || '',
@@ -276,16 +291,22 @@ export async function getUserFirestoreDoc(uid: string): Promise<any> {
         email: b.supportEmail || meta?.email || ''
       };
     } else if (meta) {
-      return {
+      fallbackData = {
         uid,
-        fullName: meta.fullName,
-        brandName: meta.brandName,
-        brandType: meta.brandType,
-        brandDescription: meta.brandDescription,
-        brandLocation: meta.brandLocation,
-        plan: meta.plan,
-        email: meta.email
+        fullName: meta.fullName || '',
+        brandName: meta.brandName || '',
+        brandType: meta.brandType || '',
+        brandDescription: meta.brandDescription || '',
+        brandLocation: meta.brandLocation || '',
+        plan: meta.plan || 'starter',
+        email: meta.email || ''
       };
+    }
+
+    if (fallbackData) {
+      // Auto-repair Firestore users/{uid} document so other devices have immediate access
+      saveUserProfileFirestore(uid, fallbackData).catch(err => console.warn('[Firestore] Auto-repair user document notice:', err));
+      return fallbackData;
     }
   } catch (e) {
     console.warn('Error fetching user document from Firestore:', e);
@@ -380,15 +401,21 @@ export async function syncBrandInFirestore(
         ...existingData,
         id: uid,
         userId: uid,
-        name: userProfile?.brandName || brandName || existingData.name || '',
-        type: userProfile?.brandType || brandType || existingData.type || '',
-        description: userProfile?.brandDescription || brandDesc || existingData.description || '',
-        location: userProfile?.brandLocation || brandLocation || existingData.location || '',
-        plan: plan || existingData.plan || 'starter',
-        supportEmail: email || existingData.supportEmail || email,
+        name: existingData.name || userProfile?.brandName || brandName || '',
+        type: existingData.type || userProfile?.brandType || brandType || '',
+        description: (existingData.description !== undefined && existingData.description !== null && existingData.description !== '') 
+          ? existingData.description 
+          : (userProfile?.brandDescription || brandDesc || ''),
+        location: existingData.location || userProfile?.brandLocation || brandLocation || '',
+        plan: existingData.plan || plan || 'starter',
+        supportEmail: existingData.supportEmail || email,
         logoUrl: typeof existingData.logoUrl === 'string' ? existingData.logoUrl : '',
       };
       await setDoc(brandRef, updated, { merge: true });
+      // Keep user doc profile in sync with brand description
+      if (updated.description) {
+        saveUserProfileFirestore(uid, { brandDescription: updated.description }).catch(() => {});
+      }
       return updated;
     }
   } catch (e) {
