@@ -324,7 +324,7 @@ export default function App() {
       if (cleanHash.startsWith('#/passport/')) {
         setCurrentRoute(cleanHash.slice(2)); // 'passport/:id'
       } else if (cleanHash === '#/brand/collections' || cleanHash.startsWith('#/brand/collections')) {
-        setCurrentRoute('brand/collections');
+        setCurrentRoute(rawHash.slice(2));
       } else if (cleanHash === '#/dashboard' && user) {
         setCurrentRoute('dashboard');
       } else if (cleanHash === '#/products' && user) {
@@ -524,7 +524,16 @@ export default function App() {
 
   // 1b. PUBLIC BRAND COLLECTIONS ROUTE
   if (currentRoute === 'brand/collections' || currentRoute.startsWith('brand/collections')) {
-    return <BrandCollections onNavigate={navigateTo} />;
+    let brandIdParam: string | undefined = undefined;
+    if (currentRoute.includes('brandId=')) {
+      brandIdParam = currentRoute.split('brandId=')[1]?.split('&')[0];
+    } else if (currentRoute.includes('/')) {
+      const parts = currentRoute.split('/')[0]?.split('?')[0].split('/');
+      if (parts && parts.length >= 3 && parts[2]) {
+        brandIdParam = parts[2];
+      }
+    }
+    return <BrandCollections onNavigate={navigateTo} brandId={brandIdParam} />;
   }
 
   // 1c. PUBLIC DEMO DASHBOARD ROUTE

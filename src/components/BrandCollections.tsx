@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Folder, ArrowLeft, ShieldCheck, ExternalLink, Sparkles, Grid, Layers, Search, CheckCircle, Tag, ChevronRight, Globe, MessageSquare 
 } from 'lucide-react';
-import { getBrand, getCollectionsWithProducts, getProductsByBrand } from '../lib/storage';
+import { getBrand, getCollectionsWithProducts, getProductsByBrand, syncProductsWithRemote } from '../lib/storage';
+import { fetchProductsFirestore } from '../lib/firebase';
 import { Collection, Product } from '../types';
 import ProBadge from './ProBadge';
 
@@ -13,11 +14,36 @@ interface BrandCollectionsProps {
 
 export default function BrandCollections({ onNavigate, brandId }: BrandCollectionsProps) {
   const brand = getBrand();
-  const collectionsWithProducts = getCollectionsWithProducts(brandId || brand.id);
-  const allBrandProducts = getProductsByBrand(brandId || brand.id).filter(p => p.isPublished !== false);
-  
+  const targetBrandId = brandId || brand.id;
+
+  const [allBrandProducts, setAllBrandProducts] = useState<Product[]>([]);
+  const [collectionsWithProducts, setCollectionsWithProducts] = useState<(Collection & { products: Product[] })[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const loadData = () => {
+    const prods = getProductsByBrand(targetBrandId).filter(p => p.isPublished !== false);
+    const cols = getCollectionsWithProducts(targetBrandId);
+    setAllBrandProducts(prods);
+    setCollectionsWithProducts(cols);
+  };
+
+  useEffect(() => {
+    loadData();
+
+    if (targetBrandId) {
+      fetchProductsFirestore(targetBrandId).then(remoteProds => {
+        if (remoteProds && remoteProds.length > 0) {
+          syncProductsWithRemote(remoteProds, targetBrandId);
+          loadData();
+        }
+      }).catch(err => console.warn('[BrandCollections] Firestore fetch notice:', err));
+    }
+
+    const handleStorage = () => loadData();
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [targetBrandId]);
 
   // Filter products by collection tab & search
   const filteredProducts = allBrandProducts.filter(product => {

@@ -5,7 +5,7 @@ import {
   Compass, Droplets, Waves, Clipboard, Calendar, Tag, MapPin, Users, HelpCircle, Flag
 } from 'lucide-react';
 import { Product, Brand, Ownership, Customer } from '../types';
-import { getProductById, getBrand, registerWarranty, getOwnerships, recordQRCodeScan, getProducts, getProductsByBrand, isProductLiked, toggleProductLike, getCustomers } from '../lib/storage';
+import { getProductById, getBrand, registerWarranty, getOwnerships, recordQRCodeScan, getProducts, getProductsByBrand, isProductLiked, toggleProductLike, getCustomers, isPreviewModeReadOnly } from '../lib/storage';
 import { fetchProductByIdFirestore } from '../lib/firebase';
 import ProBadge from './ProBadge';
 import WarrantyTracker from './WarrantyTracker';
@@ -75,15 +75,21 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
 
   const allImages = product ? [product.heroImage, ...(product.galleryImages || [])].filter(img => img && img.trim() !== '') : [];
 
-  // Track scanning analytics on mount
+  // Track scanning analytics on mount (guarded per scan session, disabled in preview)
   useEffect(() => {
     if (product) {
-      recordQRCodeScan(product.id);
+      if (!isPreviewModeReadOnly()) {
+        const sessionScanKey = `vt_scanned_${product.id}`;
+        if (!sessionStorage.getItem(sessionScanKey)) {
+          sessionStorage.setItem(sessionScanKey, 'true');
+          recordQRCodeScan(product.id, product.brandId || brand.id);
+        }
+      }
       setCurrentImageIndex(0);
       setIsFavorite(isProductLiked(product.id));
       setLikeCount(product.likeCount || 0);
     }
-  }, [productId]);
+  }, [productId, product?.id]);
 
   // Auto slide effect
   useEffect(() => {
@@ -718,7 +724,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
             </div>
             {onNavigate && (
               <button
-                onClick={() => onNavigate('brand/collections')}
+                onClick={() => onNavigate(`brand/collections?brandId=${product?.brandId || brand.id}`)}
                 className="self-start sm:self-auto px-4 py-1.5 bg-[#0F5132]/10 hover:bg-[#0F5132]/15 text-[#0F5132] font-semibold text-xs rounded-full border border-[#0F5132]/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 shrink-0"
               >
                 <span>View All Collection</span>

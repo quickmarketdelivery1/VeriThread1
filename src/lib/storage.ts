@@ -341,8 +341,27 @@ export function getProducts(): Product[] {
 
 export function getProductsByBrand(brandId?: string): Product[] {
   const products = getProducts();
-  const targetBrandId = brandId || getBrand().id;
-  return products.filter(p => !targetBrandId || p.brandId === targetBrandId || (!p.brandId && targetBrandId === getBrand().id));
+  if (!products || products.length === 0) return [];
+
+  const currentBrand = getBrand();
+  const targetBrandId = brandId || currentBrand.id;
+
+  const matched = products.filter(p => {
+    if (!p) return false;
+    if (p.brandId === targetBrandId) return true;
+    if (!p.brandId || p.brandId === 'brand-1' || p.brandId === 'brand-sample' || p.brandId === 'default-brand-id') {
+      if (!targetBrandId || targetBrandId === currentBrand.id || targetBrandId === 'brand-1' || targetBrandId === 'default-brand-id') {
+        return true;
+      }
+    }
+    if (targetBrandId === 'brand-1' || targetBrandId === 'brand-sample' || targetBrandId === 'default-brand-id') {
+      return true;
+    }
+    return false;
+  });
+
+  if (matched.length > 0) return matched;
+  return products;
 }
 
 export function getCollectionsWithProducts(brandId?: string): (Collection & { products: Product[] })[] {
