@@ -360,6 +360,7 @@ export function getProductById(id: string): Product | undefined {
 }
 
 export function syncProductsWithRemote(fsProducts: Product[], brandId: string): Product[] {
+  console.log('[DEBUG] syncProductsWithRemote called with fsProducts count:', Array.isArray(fsProducts) ? fsProducts.length : 0, 'brandId:', brandId);
   if (!Array.isArray(fsProducts)) return getProducts();
 
   const currentLocal = getProducts();
@@ -379,14 +380,16 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
   fsProducts.forEach(fp => {
     const local = currentLocal.find(l => l.id === fp.id);
     if (!local) {
-      updatedBrandProds.push(fp);
+      updatedBrandProds.push({ ...fp, brandId });
     } else {
       const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
       const fsTime = fp.updatedAt ? new Date(fp.updatedAt).getTime() : 0;
       if (fsTime >= localTime) {
-        updatedBrandProds.push(fp);
+        updatedBrandProds.push({ ...fp, brandId });
       } else {
-        updatedBrandProds.push({ ...fp, ...local });
+        const merged = { ...fp, ...local, brandId };
+        updatedBrandProds.push(merged);
+        saveProductFirestore(merged).catch(e => console.warn('[Storage] Push newer local product to Firestore:', e));
       }
     }
   });
@@ -397,19 +400,19 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
     const isThisBrand = lp.brandId === brandId || !lp.brandId || lp.brandId === 'brand-1' || lp.brandId === 'brand-sample';
     if (isThisBrand && !fsMap.has(lp.id)) {
       const createdTime = lp.createdAt ? new Date(lp.createdAt).getTime() : 0;
-      // If created within the last 3 minutes, it might be pending initial sync
-      if (createdTime > 0 && now - createdTime < 3 * 60 * 1000) {
+      // Keep local product and push to Firestore unless created over 10 minutes ago and remote explicitly returned list
+      if (createdTime === 0 || (now - createdTime < 10 * 60 * 1000) || fsProducts.length === 0) {
         const fixedProduct = { ...lp, brandId };
         updatedBrandProds.push(fixedProduct);
-        saveProductFirestore(fixedProduct).catch(e => console.warn('[Storage] Background push local pending product to Firestore:', e));
+        saveProductFirestore(fixedProduct).catch(e => console.warn('[Storage] Background push local product to Firestore:', e));
       }
-      // Otherwise it was deleted on Firestore so omit it (deletion propagation)
     }
   });
 
   const finalCombined = [...updatedBrandProds, ...otherBrandProds];
   try {
     localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(finalCombined));
+    console.log('[DEBUG] syncProductsWithRemote updated localStorage. Total count:', finalCombined.length);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('storage'));
     }
@@ -421,7 +424,7 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
 }
 
 export function saveProduct(product: Product): Product[] {
-  console.log('[Storage] saveProduct called for product:', product.name, 'ID:', product.id);
+  console.log('[DEBUG] saveProduct called with product:', product);
   if (isPreviewModeReadOnly()) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return getProducts();
@@ -438,9 +441,13 @@ export function saveProduct(product: Product): Product[] {
     }
   } catch (e) {}
 
+  const finalBrandId = (product.brandId && product.brandId !== 'brand-1' && product.brandId !== 'brand-sample')
+    ? product.brandId
+    : (effectiveBrandId || brand.id || 'brand-1');
+
   const productWithBrand: Product = { 
     ...product, 
-    brandId: product.brandId || effectiveBrandId || brand.id || 'brand-1',
+    brandId: finalBrandId,
     updatedAt: new Date().toISOString()
   };
 
@@ -453,6 +460,7 @@ export function saveProduct(product: Product): Product[] {
   }
 
   try {
+    console.log('[DEBUG] localStorage setItem called with:', list);
     localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(list));
     console.log('[Storage] Product successfully saved to localStorage. Total products:', list.length);
     if (typeof window !== 'undefined') {
@@ -463,6 +471,7 @@ export function saveProduct(product: Product): Product[] {
   }
 
   // Mandatory Firestore persistence
+  console.log('[DEBUG] Calling saveProductFirestore for product ID:', productWithBrand.id);
   saveProductFirestore(productWithBrand).catch(err => 
     console.warn('[Storage] Firestore sync product warning:', err)
   );

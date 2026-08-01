@@ -472,34 +472,35 @@ export async function saveBrandFirestore(brand: Brand): Promise<void> {
 }
 
 export async function saveProductFirestore(product: Product): Promise<void> {
-  console.log('[Firestore] saveProductFirestore called for product ID:', product.id);
+  console.log('[DEBUG] saveProductFirestore called with product:', product);
   try {
     const cleanProduct = sanitizeForFirestore(product);
     await setDoc(doc(db, 'products', product.id), cleanProduct, { merge: true });
-    console.log('[Firestore] saveProductFirestore successfully written to Firestore for product ID:', product.id);
+    console.log('[DEBUG] saveProductFirestore written successfully to Firestore for product ID:', product.id);
   } catch (e: any) {
-    console.warn('[Firestore] saveProductFirestore error:', e?.message || e);
+    console.warn('[DEBUG] saveProductFirestore error:', e?.message || e);
   }
 }
 
 export async function deleteProductFirestore(productId: string): Promise<void> {
+  console.log('[DEBUG] deleteProductFirestore called for product ID:', productId);
   try {
     await deleteDoc(doc(db, 'products', productId));
   } catch (e) {
-    console.warn('Firestore deleteProduct error:', e);
+    console.warn('[DEBUG] Firestore deleteProduct error:', e);
   }
 }
 
 export async function fetchProductsFirestore(brandId: string): Promise<Product[]> {
-  console.log('[Firestore] fetchProductsFirestore called for brandId:', brandId);
+  console.log('[DEBUG] fetchProductsFirestore called with brandId:', brandId);
   try {
     const q = query(collection(db, 'products'), where('brandId', '==', brandId));
     const snap = await getDocs(q);
     const products = snap.docs.map(d => d.data() as Product);
-    console.log('[Firestore] fetchProductsFirestore returned', products.length, 'products from Firestore');
+    console.log('[DEBUG] fetchProductsFirestore returned', products.length, 'products from Firestore');
     return products;
   } catch (e: any) {
-    console.warn('[Firestore] fetchProductsFirestore error:', e?.message || e);
+    console.warn('[DEBUG] fetchProductsFirestore error:', e?.message || e);
     return [];
   }
 }

@@ -44,13 +44,17 @@ export default function ProductsListPage({ onNavigate, onRefresh }: ProductsList
   };
 
   useEffect(() => {
-    setProducts(getProducts());
+    const initialProds = getProducts();
+    console.log('[DEBUG] ProductsListPage loaded products from getProducts():', initialProds);
+    setProducts(initialProds);
     syncFirestoreData();
   }, []);
 
   useEffect(() => {
     const handleStorage = () => {
-      setProducts(getProducts());
+      const updatedProds = getProducts();
+      console.log('[DEBUG] ProductsListPage storage event triggered. Updated products:', updatedProds);
+      setProducts(updatedProds);
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);

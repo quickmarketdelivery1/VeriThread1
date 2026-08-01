@@ -366,31 +366,10 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
     const errs: Record<string, string> = {};
 
     if (!name.trim()) errs.name = 'Product name is required';
-    if (!sku.trim()) errs.sku = 'SKU is required';
-    if (!fabric.trim()) errs.fabric = 'Fabric composition details are required';
-    if (!color.trim()) errs.color = 'Color is required';
 
-    if (buyNowType === 'whatsapp' && !buyNowValue.trim()) {
-      errs.buyNowValue = 'WhatsApp contact phone is required';
-    } else if (buyNowType === 'instagram' && !buyNowValue.trim()) {
-      errs.buyNowValue = 'Instagram handle/profile is required';
-    } else if (buyNowType === 'custom' && !buyNowValue.trim()) {
-      errs.buyNowValue = 'Destination URL or coordinate value is required';
-    }
-
-    if (errs.name || errs.sku) {
+    if (errs.name) {
       setErrors(errs);
       setCurrentStep(1);
-      return false;
-    }
-    if (errs.fabric || errs.color) {
-      setErrors(errs);
-      setCurrentStep(2);
-      return false;
-    }
-    if (errs.buyNowValue) {
-      setErrors(errs);
-      setCurrentStep(4);
       return false;
     }
 
@@ -410,17 +389,17 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
 
   const handlePublish = async (isPublishing: boolean) => {
     if (isSubmittingProduct) return;
-    console.log('[ProductCreationFlow] handlePublish initiated. isPublishing:', isPublishing);
+    console.log('[DEBUG] handlePublish called. isPublishing:', isPublishing);
 
     if (!validateAllSteps()) {
-      console.warn('[ProductCreationFlow] Validation failed in handlePublish');
+      console.warn('[DEBUG] Validation failed in handlePublish');
       return;
     }
 
     setIsSubmittingProduct(true);
 
     try {
-      // 1. Strict limit check on active publication
+      // 1. Check limit on active publication
       const qrResult = incrementQRCount();
       if (!qrResult.allowed) {
         console.warn('[ProductCreationFlow] Monthly QR limit reached:', qrResult.message);
@@ -439,24 +418,39 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         finalCare.push(customCare.trim());
       }
 
+      // Determine real user brand ID reliably from storage/auth
+      const freshBrand = getBrand();
+      let activeBrandId = freshBrand.id;
+      try {
+        const authUser = localStorage.getItem('vt_auth_user');
+        if (authUser) {
+          const parsed = JSON.parse(authUser);
+          if (parsed.uid) activeBrandId = parsed.uid;
+        }
+      } catch (e) {}
+
       const safeName = (name || 'Bespoke Garment').trim();
       const uniqueId = `prod-${safeName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(1000 + Math.random() * 9000)}`;
       const safeHeroImage = heroImage.trim() || galleryImages.find(img => img && img.trim()) || 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&q=80&w=800';
 
+      const finalSku = sku.trim() || `VT-${Math.floor(1000 + Math.random() * 9000)}`;
+      const finalFabric = fabric.trim() || 'Premium Bespoke Fabric';
+      const finalColor = color.trim() || 'Bespoke';
+
       const newProduct: Product = {
         id: uniqueId,
-        brandId: brand.id || 'brand-1',
+        brandId: activeBrandId || 'brand-1',
         collectionId: collectionId.trim() || undefined,
         name: safeName,
-        sku: sku.trim() || `AA-TRD-${Math.floor(100 + Math.random() * 900)}`,
+        sku: finalSku,
         category: category || 'Traditional Wear',
         description: `Premium bespoke tailored ${safeName}. Sourced and handcrafted in Nigeria.`,
         priceMin: priceMin !== '' ? Number(priceMin) : undefined,
         priceMax: priceMax !== '' ? Number(priceMax) : undefined,
-        fabric: fabric.trim() || 'Premium Fabric',
+        fabric: finalFabric,
         material: material || 'Cotton',
         gsm: gsm || 'Medium 150-200',
-        color: color.trim() || 'Bespoke',
+        color: finalColor,
         fit: fit || 'Regular',
         careInstructions: finalCare,
         sizeGuide: sizeGuide.trim() || undefined,
@@ -476,15 +470,15 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         updatedAt: new Date().toISOString()
       };
 
-      console.log('[ProductCreationFlow] Saving product to localStorage:', newProduct);
+      console.log('[DEBUG] Calling saveProduct with product:', newProduct);
       saveProduct(newProduct);
 
-      // Background Firestore sync safely without blocking success UI
+      console.log('[DEBUG] Calling saveProductFirestore with product:', newProduct);
       saveProductFirestore(newProduct).catch(fsErr => {
-        console.warn('[ProductCreationFlow] Firestore background sync notice:', fsErr);
+        console.warn('[DEBUG] saveProductFirestore background notice:', fsErr);
       });
 
-      console.log('[ProductCreationFlow] Product certified & saved successfully:', uniqueId);
+      console.log('[DEBUG] Setting createdProductId and setIsSuccess(true):', uniqueId);
       setCreatedProductId(uniqueId);
       setIsSuccess(true);
       onRefresh();
@@ -493,7 +487,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (err: any) {
-      console.error("[ProductCreationFlow] Error publishing product:", err);
+      console.error("[DEBUG] Error publishing product:", err);
       alert("Could not certify product passport. Please check required fields and try again.");
     } finally {
       setIsSubmittingProduct(false);
