@@ -68,6 +68,15 @@ function formatError(err: any): string {
   }
 }
 
+export function sanitizeForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(
+    JSON.stringify(obj, (_key, value) => {
+      return value === undefined ? null : value;
+    })
+  );
+}
+
 /**
  * Register User: Create user with email and password, send email verification, and store profile in Firestore users/{uid}
  */
@@ -107,7 +116,7 @@ export async function registerUser(userData: {
 
     // Save user profile in Firestore under collection `users`, doc `{uid}`
     const userDocRef = doc(db, 'users', user.uid);
-    const userPayload = {
+    const userPayload = sanitizeForFirestore({
       uid: user.uid,
       fullName: userData.fullName.trim(),
       brandName: userData.brandName.trim(),
@@ -121,13 +130,13 @@ export async function registerUser(userData: {
       paidAmount: userData.paidAmount || null,
       email: cleanEmail,
       createdAt: new Date().toISOString()
-    };
+    });
     await setDoc(userDocRef, userPayload, { merge: true });
 
     // Also sync brand document for application compatibility
     const brandRef = doc(db, 'brands', user.uid);
     const normalizedPlan = userData.plan.toLowerCase() as 'starter' | 'professional' | 'enterprise';
-    const newBrand: Brand = {
+    const newBrand: Brand = sanitizeForFirestore({
       id: user.uid,
       userId: user.uid,
       name: userData.brandName.trim(),
@@ -146,12 +155,12 @@ export async function registerUser(userData: {
       slogan: 'Digital Product Passport Atelier',
       plan: normalizedPlan,
       hasDevAccess: !!userData.hasDevAccess,
-      paystackReference: userData.paystackReference,
-      paidAmount: userData.paidAmount,
+      paystackReference: userData.paystackReference || null,
+      paidAmount: userData.paidAmount || null,
       qrUsedThisMonth: 0,
       aiUsedThisMonth: 0,
       lastResetDate: new Date().toISOString()
-    };
+    });
     await setDoc(brandRef, newBrand, { merge: true });
 
     // Ensure newly registered user is signed out until they verify email
@@ -398,7 +407,7 @@ export async function syncBrandInFirestore(
     const docSnap = await getDoc(brandRef);
     if (docSnap.exists()) {
       const existingData = docSnap.data() as Brand;
-      const updated: Brand = {
+      const updated: Brand = sanitizeForFirestore({
         ...existingData,
         id: uid,
         userId: uid,
@@ -411,7 +420,7 @@ export async function syncBrandInFirestore(
         plan: existingData.plan || plan || 'starter',
         supportEmail: existingData.supportEmail || email,
         logoUrl: typeof existingData.logoUrl === 'string' ? existingData.logoUrl : '',
-      };
+      });
       await setDoc(brandRef, updated, { merge: true });
       // Keep user doc profile in sync with brand description
       if (updated.description) {
@@ -424,7 +433,7 @@ export async function syncBrandInFirestore(
   }
 
   // Create brand document for new signup / first login
-  const newBrand: Brand = {
+  const newBrand: Brand = sanitizeForFirestore({
     id: uid,
     userId: uid,
     name: brandName,
@@ -445,7 +454,7 @@ export async function syncBrandInFirestore(
     qrUsedThisMonth: 0,
     aiUsedThisMonth: 0,
     lastResetDate: new Date().toISOString()
-  };
+  });
 
   try {
     await setDoc(brandRef, newBrand);
@@ -454,13 +463,6 @@ export async function syncBrandInFirestore(
   }
 
   return newBrand;
-}
-
-function sanitizeForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  return JSON.parse(JSON.stringify(obj, (_key, value) => {
-    return value === undefined ? null : value;
-  }));
 }
 
 export async function saveBrandFirestore(brand: Brand): Promise<void> {
