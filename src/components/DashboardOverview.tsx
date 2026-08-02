@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, QrCode, Globe, ArrowUpRight, ShieldCheck, UserCheck, Smartphone, Eye, RefreshCw, AlertCircle, Calendar, Sparkles, CheckCircle, Heart } from 'lucide-react';
+import { Plus, QrCode, Globe, ArrowUpRight, ShieldCheck, UserCheck, Smartphone, Eye, RefreshCw, AlertCircle, Calendar, Sparkles, CheckCircle, Heart, Lock, Zap } from 'lucide-react';
 import { Product, Collection, QRCode, Ownership, AnalyticsEvent } from '../types';
-import { getProducts, getQRCodes, getOwnerships, getAnalyticsEvents, getBrand } from '../lib/storage';
+import { getProducts, getQRCodes, getOwnerships, getAnalyticsEvents, getBrand, checkQRLimit, checkSubscriptionExpiry } from '../lib/storage';
 import ProBadge from './ProBadge';
+import { PlanUpgradeModal } from './PlanUpgradeModal';
 
 interface DashboardOverviewProps {
   brandName: string;
@@ -11,12 +12,21 @@ interface DashboardOverviewProps {
 }
 
 export default function DashboardOverview({ brandName, onNavigate, isDemo }: DashboardOverviewProps) {
-  const brand = getBrand();
+  const [brand, setBrand] = useState(() => getBrand());
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const products = getProducts();
   const qrcodes = getQRCodes();
   const ownerships = getOwnerships();
   const activities = getAnalyticsEvents();
   const [opportunityNotice, setOpportunityNotice] = useState<string | null>(null);
+
+  const refreshData = () => {
+    setBrand(getBrand());
+  };
+
+  // Plan Status & Expiry Logic
+  const qrLimitStatus = checkQRLimit(brand);
+  const expiryStatus = checkSubscriptionExpiry(brand);
 
   // Compute metrics dynamically
   const totalProducts = products.length;
@@ -48,6 +58,14 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
   const displayBrandLocation = brand.location || userObj?.brandLocation || '';
   const displayPlan = (brand.plan || userObj?.plan || 'Starter').charAt(0).toUpperCase() + (brand.plan || userObj?.plan || 'Starter').slice(1);
 
+  // QR usage calculation for UI display
+  const totalQrCount = qrcodes.length;
+  const usedCount = brand.plan === 'starter' 
+    ? Math.max(brand.qrUsed ?? 0, totalQrCount) 
+    : (brand.qrUsedThisMonth || 0);
+  const maxLimit = brand.plan === 'starter' ? 5 : 250;
+  const pctUsed = Math.min(100, Math.round((usedCount / maxLimit) * 100));
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in font-sans">
       {/* Welcome Header */}
@@ -74,13 +92,120 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
         </div>
       </div>
 
-      {/* Brand Profile Overview Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <h3 className="font-display font-semibold text-xs text-gray-400 uppercase tracking-wider">Registered Brand Profile</h3>
-          <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-[#0F5132] border border-emerald-100 rounded-full">
-            Plan: {displayPlan}
-          </span>
+      {/* Expiry / Renewal Notification Banners */}
+      {brand.plan === 'professional' && expiryStatus.isExpired && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-900 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm">Professional Subscription Expired</h4>
+              <p className="text-xs text-rose-700 mt-0.5">
+                Your monthly Professional subscription has ended. QR generation is paused, but your existing passports and data remain accessible.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowUpgradeModal(true)}
+            className="bg-rose-700 hover:bg-rose-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-sm"
+          >
+            Renew Professional Plan
+          </button>
+        </div>
+      )}
+
+      {brand.plan === 'professional' && !expiryStatus.isExpired && expiryStatus.daysRemaining <= 3 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm">Subscription Renewal Reminder</h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Your Professional subscription expires in {expiryStatus.daysRemaining} day{expiryStatus.daysRemaining === 1 ? '' : 's'}. Renew early to maintain uninterrupted QR generation.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowUpgradeModal(true)}
+            className="bg-amber-800 hover:bg-amber-900 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-sm"
+          >
+            Renew Now
+          </button>
+        </div>
+      )}
+
+      {/* Brand Profile Overview & Plan Limits Card */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="font-display font-semibold text-xs text-gray-400 uppercase tracking-wider">Registered Brand & Plan Status</h3>
+            <ProBadge plan={brand.plan} size="sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            {brand.plan === 'starter' ? (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Upgrade to Professional
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Manage Subscription
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Plan Limits Bar */}
+        <div className="bg-gradient-to-r from-emerald-950 to-gray-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="font-bold text-gray-300 flex items-center gap-1.5">
+                <QrCode className="w-4 h-4 text-emerald-400" />
+                {brand.plan === 'starter' ? 'Lifetime 5 Free QR Generation Limit' : 'Monthly 250 QR Allowance'}
+              </span>
+              <span className="font-extrabold text-white font-mono">
+                {usedCount} / {maxLimit} QRs ({maxLimit - usedCount} remaining)
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 rounded-full ${
+                  pctUsed >= 100 ? 'bg-rose-500' : pctUsed >= 80 ? 'bg-amber-400' : 'bg-emerald-400'
+                }`}
+                style={{ width: `${pctUsed}%` }}
+              />
+            </div>
+            
+            <p className="text-[11px] text-gray-400 mt-2">
+              {brand.plan === 'starter' ? (
+                <>Starter Plan allows 5 total free QR code generations. <button onClick={() => setShowUpgradeModal(true)} className="text-amber-300 underline font-bold cursor-pointer hover:text-amber-200">Upgrade to Professional</button> for 250 QRs monthly.</>
+              ) : (
+                <>Professional Plan includes 250 QR certifications per monthly billing cycle. Next reset: {brand.subscriptionExpiry ? new Date(brand.subscriptionExpiry).toLocaleDateString() : 'Next month'}.</>
+              )}
+            </p>
+          </div>
+
+          {brand.plan === 'starter' && usedCount >= 5 && (
+            <div className="shrink-0">
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="bg-amber-400 hover:bg-amber-300 text-gray-950 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                Limit Reached - Upgrade Now
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
@@ -95,8 +220,12 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
           </div>
 
           <div>
-            <span className="text-gray-400 font-medium block">Location</span>
-            <span className="text-gray-900 font-bold text-sm block mt-0.5">{displayBrandLocation}</span>
+            <span className="text-gray-400 font-medium block">Subscription Expiry</span>
+            <span className="text-gray-900 font-bold text-sm block mt-0.5">
+              {brand.plan === 'starter' 
+                ? 'Lifetime Starter' 
+                : (brand.subscriptionExpiry ? new Date(brand.subscriptionExpiry).toLocaleDateString() : 'Active')}
+            </span>
           </div>
 
           <div className="md:col-span-2 lg:col-span-1">
@@ -448,6 +577,12 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
             </div>
 
           </div>
+
+      <PlanUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgraded={refreshData}
+      />
     </div>
   );
 }

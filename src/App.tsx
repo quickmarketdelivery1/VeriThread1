@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Layers, Smartphone, Folder, QrCode, BarChart3, Settings, 
-  LogOut, Menu, X, Users, Sparkles, Mail, ShieldCheck, Globe, Eye 
+  LogOut, Menu, X, Users, Sparkles, Mail, ShieldCheck, Globe, Eye, FileText
 } from 'lucide-react';
 
 import LandingPage from './components/LandingPage';
@@ -24,8 +24,11 @@ import OnboardingGuide from './components/OnboardingGuide';
 import ProBadge from './components/ProBadge';
 import DemoDashboard from './components/DemoDashboard';
 import BrandCollections from './components/BrandCollections';
+import { InvoiceView } from './components/InvoiceView';
+import { ExpiryBanner } from './components/ExpiryBanner';
+import { PlanUpgradeModal } from './components/PlanUpgradeModal';
 
-import { getBrand, initStorage, resetAllData, clearStorage, getHasDevAccess, setHasDevAccess, recordBrandSignup, syncProductsWithRemote } from './lib/storage';
+import { getBrand, initStorage, resetAllData, clearStorage, clearUserDataOnLogout, getHasDevAccess, setHasDevAccess, recordBrandSignup, syncProductsWithRemote } from './lib/storage';
 import { 
   auth, 
   onAuthStateChanged, 
@@ -68,6 +71,7 @@ export default function App() {
   // Simple reactive navigation state
   const [currentRoute, setCurrentRoute] = useState<string>('landing');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Firebase Authentication Listener & Session Management
   useEffect(() => {
@@ -84,8 +88,10 @@ export default function App() {
           await signOutUser();
           localStorage.removeItem('vt_auth_user');
           setUser(null);
-          setAuthError('Please verify your email before logging in. A confirmation link has been sent to your email.');
-          setCurrentRoute('login');
+          if (window.location.hash !== '#/signup' && currentRoute !== 'signup') {
+            setAuthError('Please verify your email before logging in. A confirmation link has been sent to your email.');
+            setCurrentRoute('login');
+          }
           return;
         }
 
@@ -127,27 +133,57 @@ export default function App() {
 
         try {
           const lp = localStorage.getItem('vt_products');
-          if (lp) localProducts = JSON.parse(lp);
+          if (lp) {
+            const parsed = JSON.parse(lp);
+            if (Array.isArray(parsed)) {
+              localProducts = parsed.filter(p => p && p.brandId === userBrand.id);
+            }
+          }
         } catch (e) {}
         try {
           const lc = localStorage.getItem('vt_collections');
-          if (lc) localCollections = JSON.parse(lc);
+          if (lc) {
+            const parsed = JSON.parse(lc);
+            if (Array.isArray(parsed)) {
+              localCollections = parsed.filter(c => c && (c.brandId === userBrand.id || !c.brandId));
+            }
+          }
         } catch (e) {}
         try {
           const lq = localStorage.getItem('vt_qrcodes');
-          if (lq) localQRCodes = JSON.parse(lq);
+          if (lq) {
+            const parsed = JSON.parse(lq);
+            if (Array.isArray(parsed)) {
+              localQRCodes = parsed.filter(q => q && (q.brandId === userBrand.id || !q.brandId));
+            }
+          }
         } catch (e) {}
         try {
           const lcu = localStorage.getItem('vt_customers');
-          if (lcu) localCustomers = JSON.parse(lcu);
+          if (lcu) {
+            const parsed = JSON.parse(lcu);
+            if (Array.isArray(parsed)) {
+              localCustomers = parsed.filter(c => c && (c.brandId === userBrand.id || !c.brandId));
+            }
+          }
         } catch (e) {}
         try {
           const lo = localStorage.getItem('vt_ownerships');
-          if (lo) localOwnerships = JSON.parse(lo);
+          if (lo) {
+            const parsed = JSON.parse(lo);
+            if (Array.isArray(parsed)) {
+              localOwnerships = parsed.filter(o => o && (o.brandId === userBrand.id || !o.brandId));
+            }
+          }
         } catch (e) {}
         try {
           const la = localStorage.getItem('vt_analytics');
-          if (la) localAnalytics = JSON.parse(la);
+          if (la) {
+            const parsed = JSON.parse(la);
+            if (Array.isArray(parsed)) {
+              localAnalytics = parsed.filter(a => a && (a.brandId === userBrand.id || !a.brandId));
+            }
+          }
         } catch (e) {}
 
         // Non-destructive merge helper: preserves locally added/edited items not yet returned by Firestore
@@ -495,8 +531,9 @@ export default function App() {
 
   const handleLogout = async () => {
     setHasDevAccess(false);
-    localStorage.removeItem('vt_auth_user');
+    clearUserDataOnLogout();
     setUser(null);
+    setBrand(getBrand());
     await signOutUser();
     navigateTo('landing');
   };
@@ -559,6 +596,7 @@ export default function App() {
           onNavigate={navigateTo} 
           onLoginSuccess={handleLoginSuccess} 
           onPreviewLogin={handlePreviewLogin}
+          initialMessage={authError || undefined}
         />
       );
     }
@@ -621,6 +659,7 @@ export default function App() {
                 { route: 'customers', label: 'Customer CRM', icon: Users },
                 { route: 'campaigns', label: 'Customer Campaigns', icon: Mail },
                 { route: 'analytics', label: 'Growth Insights', icon: BarChart3 },
+                { route: 'invoices', label: 'Invoices & Billing', icon: FileText },
                 { route: 'ai-help', label: 'AI Premium Help', icon: Sparkles },
                 { route: 'demo', label: 'Interactive Plan Demo', icon: Smartphone },
                 ...(hasDevAccess ? [{ route: 'admin', label: 'Developer Admin', icon: ShieldCheck }] : []),
@@ -738,6 +777,7 @@ export default function App() {
                     { route: 'customers', label: 'Customer CRM', icon: Users },
                     { route: 'campaigns', label: 'Customer Campaigns', icon: Mail },
                     { route: 'analytics', label: 'Growth Insights', icon: BarChart3 },
+                    { route: 'invoices', label: 'Invoices & Billing', icon: FileText },
                     { route: 'ai-help', label: 'AI Premium Help', icon: Sparkles },
                     ...(hasDevAccess ? [{ route: 'admin', label: 'Developer Admin', icon: ShieldCheck }] : []),
                     { route: 'settings', label: 'Brand Settings', icon: Settings },
@@ -780,6 +820,11 @@ export default function App() {
           
           {/* Scrollable Sub-View container */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 md:p-10 max-w-7xl w-full mx-auto">
+            <ExpiryBanner
+              brand={brand}
+              onRenew={() => setShowUpgradeModal(true)}
+            />
+
             {currentRoute === 'dashboard' && (
               <DashboardOverview brandName={brand.name} onNavigate={navigateTo} isDemo={false} />
             )}
@@ -812,6 +857,10 @@ export default function App() {
               <AnalyticsDashboard />
             )}
 
+            {currentRoute === 'invoices' && (
+              <InvoiceView onNavigate={navigateTo} />
+            )}
+
             {currentRoute === 'settings' && (
               <BrandSettings onRefresh={handleRefresh} />
             )}
@@ -832,6 +881,13 @@ export default function App() {
 
         {/* Floating Success/Onboarding Guide */}
         <OnboardingGuide onNavigate={navigateTo} onRefresh={handleRefresh} />
+
+        {/* Global Plan Upgrade Modal */}
+        <PlanUpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          onUpgraded={handleRefresh}
+        />
 
       </div>
     </div>

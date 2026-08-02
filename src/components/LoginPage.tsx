@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, RefreshCw, ShieldAlert, Eye, CheckCircle, ArrowLeft } from 'lucide-react';
 import { loginUser, sendUserPasswordReset } from '../lib/firebase';
+import { clearUserDataOnLogout } from '../lib/storage';
 
 interface LoginPageProps {
   onNavigate: (route: string) => void;
   onLoginSuccess?: (email: string) => void;
   onPreviewLogin?: () => void;
+  initialMessage?: string;
 }
 
-export default function LoginPage({ onNavigate, onLoginSuccess, onPreviewLogin }: LoginPageProps) {
+export default function LoginPage({ onNavigate, onLoginSuccess, onPreviewLogin, initialMessage }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initialMessage || '');
   const [isLoading, setIsLoading] = useState(false);
 
   // Forgot Password State
@@ -35,6 +37,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess, onPreviewLogin }
     setIsLoading(true);
 
     try {
+      clearUserDataOnLogout();
       await loginUser(email.trim(), password);
       setIsLoading(false);
 

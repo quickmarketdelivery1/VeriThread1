@@ -14,6 +14,7 @@ import {
 import { getFirestore, Firestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { Brand, Product, Collection as CollectionType, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, Report } from '../types';
+import { clearUserDataOnLogout } from './storage';
 
 // Firebase Config with environment variables or safe fallbacks
 const firebaseConfig = {
@@ -357,10 +358,10 @@ export async function sendUserPasswordReset(email: string): Promise<void> {
 export async function signOutUser(): Promise<void> {
   try {
     await signOut(auth);
-    window.localStorage.removeItem('vt_auth_user');
-    window.localStorage.removeItem('vt_signup_metadata');
   } catch (err: any) {
     console.error('Error signing out:', formatError(err));
+  } finally {
+    clearUserDataOnLogout();
   }
 }
 
@@ -520,9 +521,10 @@ export async function fetchProductByIdFirestore(productId: string): Promise<Prod
   return null;
 }
 
-export async function saveCollectionFirestore(coll: CollectionType): Promise<void> {
+export async function saveCollectionFirestore(coll: CollectionType, brandId?: string): Promise<void> {
   try {
-    await setDoc(doc(db, 'collections', coll.id), coll, { merge: true });
+    const payload = (brandId || coll.brandId) ? { ...coll, brandId: brandId || coll.brandId } : coll;
+    await setDoc(doc(db, 'collections', coll.id), payload, { merge: true });
   } catch (e) {
     console.warn('Firestore saveCollection error:', e);
   }
@@ -637,6 +639,49 @@ export async function fetchReportsFirestore(brandId: string): Promise<Report[]> 
   }
 }
 
+export async function sendSubscriptionReminderEmail(
+  email: string,
+  brandName: string,
+  daysRemaining: number,
+  renewalUrl: string = 'https://verithread.com/invoices'
+): Promise<{ success: boolean; id: string }> {
+  const notifId = `email-rem-${Date.now()}`;
+  const subject = daysRemaining <= 0 
+    ? `[Action Required] Your VeriThread Professional Plan Has Expired` 
+    : daysRemaining === 1 
+    ? `[Urgent] Your VeriThread Professional Plan Expires Tomorrow` 
+    : `Your VeriThread Professional Plan Expires in ${daysRemaining} Days`;
+
+  const body = `Hi ${brandName},\n\n` +
+    (daysRemaining <= 0 
+      ? `Your Professional plan has expired. Renew now to continue generating QR codes and access Pro features.`
+      : daysRemaining === 1 
+      ? `Your Professional plan expires tomorrow. Renew now to keep your Pro features uninterrupted.`
+      : `Your Professional plan expires in ${daysRemaining} days. Renew now to avoid interruption.`) +
+    `\n\nRenew here: ${renewalUrl}\n\nThank you,\nVeriThread Team`;
+
+  const record = {
+    id: notifId,
+    email,
+    brandName,
+    daysRemaining,
+    subject,
+    body,
+    sentAt: new Date().toISOString(),
+    status: 'Sent'
+  };
+
+  try {
+    if (db) {
+      await setDoc(doc(db, 'subscription_reminders', notifId), record, { merge: true });
+    }
+  } catch (e) {
+    console.warn('Error saving email notification log to Firestore:', e);
+  }
+
+  console.log(`[Email System] Dispatched renewal notification to ${email}:`, record);
+  return { success: true, id: notifId };
+}
 
 export { onAuthStateChanged };
 

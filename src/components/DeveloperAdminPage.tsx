@@ -14,6 +14,8 @@ import {
 } from '../lib/storage';
 import { BrandSignupRecord } from '../types';
 
+import { AdminInvoices } from './AdminInvoices';
+
 interface DeveloperAdminPageProps {
   onRefresh: () => void;
 }
@@ -875,6 +877,11 @@ export default function DeveloperAdminPage({ onRefresh }: DeveloperAdminPageProp
 
         </div>
 
+      </div>
+
+      {/* ADMIN INVOICES & MANUAL PAYMENTS MANAGEMENT */}
+      <div className="pt-6 border-t border-gray-200 mt-4">
+        <AdminInvoices onRefresh={loadData} />
       </div>
 
     </div>

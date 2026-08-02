@@ -34,9 +34,12 @@ export interface Brand {
   hasDevAccess?: boolean;
   paystackReference?: string;
   paidAmount?: number;
+  qrUsed?: number;
   qrUsedThisMonth: number;
   aiUsedThisMonth: number;
   lastResetDate: string;
+  subscriptionStartDate?: string;
+  subscriptionExpiry?: string;
   billingHistory?: { id: string; date: string; amount: number; planName: string; status: string }[];
 }
 
@@ -89,6 +92,7 @@ export interface Product {
 
 export interface QRCode {
   id: string;
+  brandId?: string;
   productId: string;
   code: string; // Unique URL or code token
   scanCount: number;
@@ -98,6 +102,7 @@ export interface QRCode {
 
 export interface Customer {
   id: string;
+  brandId?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -109,6 +114,7 @@ export interface Customer {
 
 export interface Ownership {
   id: string;
+  brandId?: string;
   productId: string;
   customerId: string;
   registrationDate: string;
@@ -119,6 +125,7 @@ export interface Ownership {
 
 export interface Campaign {
   id: string;
+  brandId?: string;
   name: string;
   type: 'welcome' | 'product_care' | 'new_collection' | 'birthday' | 'vip_drop' | 'review_request' | 'referral';
   status: 'Active' | 'Paused';
@@ -136,6 +143,7 @@ export interface Campaign {
 
 export interface AnalyticsEvent {
   id: string;
+  brandId?: string;
   productId: string;
   eventType: 'scan' | 'view' | 'share' | 'register' | 'like';
   timestamp: string;
@@ -169,5 +177,25 @@ export interface Report {
   imageEvidence?: string;
   status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
   createdAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string; // e.g. "INV-001"
+  brandId: string;
+  brandName: string;
+  brandEmail: string;
+  planName: 'Professional' | 'Starter' | 'Enterprise';
+  amount: number; // e.g. 25000
+  currency: string; // 'NGN'
+  status: 'Pending' | 'Paid' | 'Overdue' | 'Cancelled';
+  invoiceDate: string;
+  dueDate: string;
+  paidAt?: string;
+  paymentMethod?: string; // 'Bank Transfer' | 'Paystack' | 'Coupon' | 'Manual Admin'
+  paymentProofRef?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 

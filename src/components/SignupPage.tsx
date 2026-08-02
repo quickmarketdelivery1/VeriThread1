@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, User, Lock, Building2, MapPin, Tag, ShieldCheck, CheckCircle, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 import { registerUser } from '../lib/firebase';
+import { clearUserDataOnLogout } from '../lib/storage';
 import { validateCouponCode, CouponValidationResult } from '../lib/coupons';
 import { PaystackCheckoutModal } from './PaystackCheckoutModal';
 
@@ -61,6 +62,7 @@ export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPagePr
   const executeFinalSignup = async (payload: any) => {
     setIsLoading(true);
     try {
+      clearUserDataOnLogout();
       localStorage.setItem('vt_signup_metadata', JSON.stringify({
         fullName: payload.fullName,
         brandName: payload.brandName,
@@ -213,15 +215,27 @@ export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPagePr
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-6 font-sans">
         <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center flex flex-col items-center gap-5">
-          <div className="w-16 h-16 bg-emerald-100 text-[#0F5132] rounded-full flex items-center justify-center">
-            <CheckCircle className="w-10 h-10" />
+          <div className="w-16 h-16 bg-emerald-100 text-[#0F5132] rounded-full flex items-center justify-center shadow-xs">
+            <CheckCircle className="w-10 h-10 text-[#0F5132]" />
           </div>
           <div>
             <h2 className="font-display text-2xl font-bold text-gray-900">Account Created!</h2>
             <p className="text-gray-600 text-sm mt-2 leading-relaxed">
-              We have sent a verification email to <strong className="text-gray-900">{email}</strong>. Please check your inbox and click the verification link before logging in.
+              We've sent a verification email to <strong className="text-gray-900">{email}</strong>. Please check your inbox and click the verification link before logging in.
             </p>
           </div>
+
+          <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl text-emerald-900 text-xs text-left w-full flex flex-col gap-2">
+            <p className="font-bold flex items-center gap-1.5 text-[#0F5132] text-xs">
+              <Mail className="w-4 h-4 text-[#0F5132]" /> Next Steps:
+            </p>
+            <ol className="list-decimal list-inside text-gray-700 space-y-1 text-xs leading-normal pl-1">
+              <li>Check your inbox at <strong className="text-gray-900">{email}</strong></li>
+              <li>Click the verification link from VeriThread</li>
+              <li>Return to sign in with your email and password</li>
+            </ol>
+          </div>
+
           <div className="flex justify-center w-full mt-2">
             <button
               onClick={() => onNavigate('login')}

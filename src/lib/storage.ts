@@ -258,6 +258,131 @@ export function saveBrand(brand: Brand) {
   }
 }
 
+// Subscription & Plan Limits Logic
+export function checkQRLimit(brand: Brand): { allowed: boolean; remaining: number; message?: string } {
+  const qrs = getQRCodes(brand.id);
+  const totalCount = qrs.length;
+
+  if (brand.plan === 'starter') {
+    const used = Math.max(brand.qrUsed ?? 0, totalCount);
+    const limit = 5;
+    if (used >= limit) {
+      return { 
+        allowed: false, 
+        remaining: 0, 
+        message: 'You have reached your 5 free QR limit. Please upgrade to Professional.' 
+      };
+    }
+    return { allowed: true, remaining: limit - used };
+  }
+  
+  if (brand.plan === 'professional') {
+    const expiry = checkSubscriptionExpiry(brand);
+    if (expiry.isExpired) {
+      return {
+        allowed: false,
+        remaining: 0,
+        message: 'Your Professional subscription has expired. Please renew your plan to generate new QR codes.'
+      };
+    }
+
+    const used = brand.qrUsedThisMonth || 0;
+    const limit = 250;
+    if (used >= limit) {
+      return { 
+        allowed: false, 
+        remaining: 0, 
+        message: 'You have reached your monthly QR limit of 250. Please wait until next month or contact support.' 
+      };
+    }
+    return { allowed: true, remaining: limit - used };
+  }
+  
+  return { allowed: true, remaining: Infinity };
+}
+
+export function checkSubscriptionExpiry(brand: Brand): { isExpired: boolean; daysRemaining: number } {
+  if (brand.plan === 'starter') {
+    return { isExpired: false, daysRemaining: Infinity };
+  }
+  
+  if (brand.plan === 'professional') {
+    if (!brand.subscriptionExpiry) {
+      const start = brand.subscriptionStartDate 
+        ? new Date(brand.subscriptionStartDate).getTime() 
+        : (brand.createdAt ? new Date(brand.createdAt).getTime() : Date.now());
+      const expiryDate = new Date(start + 30 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      const daysRemaining = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return { isExpired: daysRemaining < 0, daysRemaining };
+    }
+
+    const expiryDate = new Date(brand.subscriptionExpiry);
+    const now = new Date();
+    const daysRemaining = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return { isExpired: daysRemaining < 0, daysRemaining };
+  }
+  
+  return { isExpired: false, daysRemaining: Infinity };
+}
+
+export function incrementQRUsage(explicitBrandId?: string): Brand {
+  const brand = getBrand();
+  const targetId = explicitBrandId || brand.id;
+  const currentCount = getQRCodes(targetId).length;
+
+  const updatedBrand: Brand = {
+    ...brand,
+    qrUsed: Math.max((brand.qrUsed || 0) + 1, currentCount + 1),
+    qrUsedThisMonth: (brand.qrUsedThisMonth || 0) + 1
+  };
+
+  saveBrand(updatedBrand);
+  return updatedBrand;
+}
+
+import { createInvoice, updateInvoiceStatus } from './invoices';
+
+export function upgradeBrandToProfessional(paymentRef?: string, paidAmount: number = 25000): Brand {
+  const brand = getBrand();
+  const now = new Date();
+  const expiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  // Generate and record paid invoice
+  const inv = createInvoice(
+    brand.id,
+    brand.name,
+    brand.supportEmail || 'billing@verithread.com',
+    'Professional',
+    paidAmount,
+    'Professional Monthly License'
+  );
+  updateInvoiceStatus(inv.id, 'Paid', paymentRef || `ref-${Date.now()}`);
+
+  const updatedBrand: Brand = {
+    ...brand,
+    plan: 'professional',
+    subscriptionStartDate: now.toISOString(),
+    subscriptionExpiry: expiry.toISOString(),
+    qrUsedThisMonth: 0,
+    paystackReference: paymentRef || `pay-${Date.now()}`,
+    paidAmount: paidAmount,
+    billingHistory: [
+      ...(brand.billingHistory || []),
+      {
+        id: inv.id,
+        date: now.toISOString().split('T')[0],
+        amount: paidAmount,
+        planName: 'Professional',
+        status: 'Paid'
+      }
+    ]
+  };
+
+  saveBrand(updatedBrand);
+  return updatedBrand;
+}
+
 function isUserRegisteredSession(): boolean {
   if (typeof window === 'undefined') return false;
   const authUser = localStorage.getItem('vt_auth_user');
@@ -274,17 +399,46 @@ function isUserRegisteredSession(): boolean {
   return false;
 }
 
+export function clearUserDataOnLogout() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(KEYS.BRAND);
+  localStorage.removeItem(KEYS.COLLECTIONS);
+  localStorage.removeItem(KEYS.PRODUCTS);
+  localStorage.removeItem(KEYS.QRCODES);
+  localStorage.removeItem(KEYS.CUSTOMERS);
+  localStorage.removeItem(KEYS.OWNERSHIPS);
+  localStorage.removeItem(KEYS.ANALYTICS);
+  localStorage.removeItem(KEYS.CAMPAIGNS);
+  localStorage.removeItem(KEYS.BRAND_SIGNUPS);
+  localStorage.removeItem(KEYS.REPORTS);
+  localStorage.removeItem('vt_auth_user');
+  localStorage.removeItem('vt_signup_metadata');
+  localStorage.removeItem('vt_fresh_slate');
+  localStorage.removeItem('vt_has_dev_access');
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.clear();
+  }
+}
+
 // Collection functions
-export function getCollections(): Collection[] {
+export function getCollections(explicitBrandId?: string): Collection[] {
   initStorage();
   const data = localStorage.getItem(KEYS.COLLECTIONS);
+  let list: Collection[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) list = parsed;
     } catch {}
   }
-  return isUserRegisteredSession() ? [] : sampleCollections;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return list.filter(c => c && (c.brandId === targetBrandId || !c.brandId));
+  }
+  return list.length > 0 ? list : sampleCollections;
 }
 
 export function saveCollection(collection: Collection) {
@@ -292,15 +446,20 @@ export function saveCollection(collection: Collection) {
     alert('Preview Mode (View-Only): Data modifications are disabled in preview mode.');
     return getCollections();
   }
-  const list = getCollections();
-  const index = list.findIndex(c => c.id === collection.id);
+  const brand = getBrand();
+  const collectionWithBrand: Collection = {
+    ...collection,
+    brandId: collection.brandId || brand.id
+  };
+  const list = getCollections(brand.id);
+  const index = list.findIndex(c => c.id === collectionWithBrand.id);
   if (index >= 0) {
-    list[index] = collection;
+    list[index] = collectionWithBrand;
   } else {
-    list.push(collection);
+    list.push(collectionWithBrand);
   }
   localStorage.setItem(KEYS.COLLECTIONS, JSON.stringify(list));
-  saveCollectionFirestore(collection).catch(err => console.warn('Firestore sync collection warning:', err));
+  saveCollectionFirestore(collectionWithBrand, brand.id).catch(err => console.warn('Firestore sync collection warning:', err));
   return list;
 }
 
@@ -325,47 +484,36 @@ export function deleteCollection(id: string) {
 }
 
 // Product functions
-export function getProducts(): Product[] {
+export function getProducts(explicitBrandId?: string): Product[] {
   initStorage();
   const data = localStorage.getItem(KEYS.PRODUCTS);
+  let products: Product[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) products = parsed;
     } catch (e) {
       console.error('[Storage] Error parsing vt_products:', e);
     }
   }
-  return isUserRegisteredSession() ? [] : sampleProducts;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return products.filter(p => p && p.brandId === targetBrandId);
+  }
+
+  const matched = products.filter(p => !p.brandId || p.brandId === targetBrandId || p.brandId === 'brand-1' || p.brandId === 'brand-sample');
+  return matched.length > 0 ? matched : sampleProducts;
 }
 
 export function getProductsByBrand(brandId?: string): Product[] {
-  const products = getProducts();
-  if (!products || products.length === 0) return [];
-
-  const currentBrand = getBrand();
-  const targetBrandId = brandId || currentBrand.id;
-
-  const matched = products.filter(p => {
-    if (!p) return false;
-    if (p.brandId === targetBrandId) return true;
-    if (!p.brandId || p.brandId === 'brand-1' || p.brandId === 'brand-sample' || p.brandId === 'default-brand-id') {
-      if (!targetBrandId || targetBrandId === currentBrand.id || targetBrandId === 'brand-1' || targetBrandId === 'default-brand-id') {
-        return true;
-      }
-    }
-    if (targetBrandId === 'brand-1' || targetBrandId === 'brand-sample' || targetBrandId === 'default-brand-id') {
-      return true;
-    }
-    return false;
-  });
-
-  if (matched.length > 0) return matched;
-  return products;
+  return getProducts(brandId);
 }
 
 export function getCollectionsWithProducts(brandId?: string): (Collection & { products: Product[] })[] {
-  const collections = getCollections();
+  const collections = getCollections(brandId);
   const products = getProductsByBrand(brandId);
   return collections.map(col => ({
     ...col,
@@ -380,18 +528,24 @@ export function getProductById(id: string): Product | undefined {
 
 export function syncProductsWithRemote(fsProducts: Product[], brandId: string): Product[] {
   console.log('[DEBUG] syncProductsWithRemote called with fsProducts count:', Array.isArray(fsProducts) ? fsProducts.length : 0, 'brandId:', brandId);
-  if (!Array.isArray(fsProducts)) return getProducts();
+  if (!Array.isArray(fsProducts)) return getProducts(brandId);
 
-  const currentLocal = getProducts();
+  // Filter local storage strictly for this brandId
+  let currentLocal: Product[] = [];
+  try {
+    const raw = localStorage.getItem(KEYS.PRODUCTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        currentLocal = parsed.filter(p => p && p.brandId === brandId);
+      }
+    }
+  } catch (e) {}
+
   const fsMap = new Map<string, Product>();
   fsProducts.forEach(p => {
-    if (p && p.id) fsMap.set(p.id, p);
+    if (p && p.id) fsMap.set(p.id, { ...p, brandId });
   });
-
-  // Keep products for other brands intact
-  const otherBrandProds = currentLocal.filter(
-    p => p.brandId && p.brandId !== brandId && p.brandId !== 'brand-1' && p.brandId !== 'brand-sample'
-  );
 
   const updatedBrandProds: Product[] = [];
 
@@ -416,10 +570,8 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
   // 2. Process local items for this brand not in Firestore
   const now = Date.now();
   currentLocal.forEach(lp => {
-    const isThisBrand = lp.brandId === brandId || !lp.brandId || lp.brandId === 'brand-1' || lp.brandId === 'brand-sample';
-    if (isThisBrand && !fsMap.has(lp.id)) {
+    if (!fsMap.has(lp.id)) {
       const createdTime = lp.createdAt ? new Date(lp.createdAt).getTime() : 0;
-      // Keep local product and push to Firestore unless created over 10 minutes ago and remote explicitly returned list
       if (createdTime === 0 || (now - createdTime < 10 * 60 * 1000) || fsProducts.length === 0) {
         const fixedProduct = { ...lp, brandId };
         updatedBrandProds.push(fixedProduct);
@@ -428,10 +580,8 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
     }
   });
 
-  const finalCombined = [...updatedBrandProds, ...otherBrandProds];
   try {
-    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(finalCombined));
-    console.log('[DEBUG] syncProductsWithRemote updated localStorage. Total count:', finalCombined.length);
+    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(updatedBrandProds));
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('storage'));
     }
@@ -439,7 +589,7 @@ export function syncProductsWithRemote(fsProducts: Product[], brandId: string): 
     console.warn('[Storage] Error saving synced products to localStorage:', e);
   }
 
-  return finalCombined;
+  return updatedBrandProds;
 }
 
 export function saveProduct(product: Product): Product[] {
@@ -531,16 +681,24 @@ export function deleteProduct(id: string) {
 
 
 // QR Code functions
-export function getQRCodes(): QRCode[] {
+export function getQRCodes(explicitBrandId?: string): QRCode[] {
   initStorage();
   const data = localStorage.getItem(KEYS.QRCODES);
+  let codes: QRCode[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) codes = parsed;
     } catch {}
   }
-  return isUserRegisteredSession() ? [] : sampleQRCodes;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return codes.filter(q => q && (q.brandId === targetBrandId || !q.brandId));
+  }
+  return codes.length > 0 ? codes : sampleQRCodes;
 }
 
 export function getOrCreateQRCode(productId: string): QRCode {
@@ -616,28 +774,44 @@ export function recordQRCodeScan(productId: string, explicitBrandId?: string) {
 }
 
 // Customer & Ownership functions
-export function getCustomers(): Customer[] {
+export function getCustomers(explicitBrandId?: string): Customer[] {
   initStorage();
   const data = localStorage.getItem(KEYS.CUSTOMERS);
+  let customers: Customer[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) customers = parsed;
     } catch {}
   }
-  return isUserRegisteredSession() ? [] : sampleCustomers;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return customers.filter(c => c && (c.brandId === targetBrandId || !c.brandId));
+  }
+  return customers.length > 0 ? customers : sampleCustomers;
 }
 
-export function getOwnerships(): Ownership[] {
+export function getOwnerships(explicitBrandId?: string): Ownership[] {
   initStorage();
   const data = localStorage.getItem(KEYS.OWNERSHIPS);
+  let ownerships: Ownership[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) ownerships = parsed;
     } catch {}
   }
-  return isUserRegisteredSession() ? [] : sampleOwnerships;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return ownerships.filter(o => o && (o.brandId === targetBrandId || !o.brandId));
+  }
+  return ownerships.length > 0 ? ownerships : sampleOwnerships;
 }
 
 export function registerWarranty(productId: string, customerData: { email: string; firstName: string; lastName: string; phone?: string }) {
@@ -708,16 +882,24 @@ export function registerWarranty(productId: string, customerData: { email: strin
 }
 
 // Analytics functions
-export function getAnalyticsEvents(): AnalyticsEvent[] {
+export function getAnalyticsEvents(explicitBrandId?: string): AnalyticsEvent[] {
   initStorage();
   const data = localStorage.getItem(KEYS.ANALYTICS);
+  let events: AnalyticsEvent[] = [];
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) events = parsed;
     } catch {}
   }
-  return isUserRegisteredSession() ? [] : sampleAnalyticsEvents;
+
+  const currentBrand = getBrand();
+  const targetBrandId = explicitBrandId || currentBrand.id;
+
+  if (isUserRegisteredSession()) {
+    return events.filter(e => e && (e.brandId === targetBrandId || !e.brandId));
+  }
+  return events.length > 0 ? events : sampleAnalyticsEvents;
 }
 
 export function recordAnalyticsEvent(event: AnalyticsEvent, explicitBrandId?: string) {
@@ -911,25 +1093,23 @@ export function checkAndResetMonthlyLimits(brand: Brand): Brand {
 export function incrementQRCount(): { allowed: boolean; brand: Brand; message?: string } {
   const brand = getBrand();
   const resetBrand = checkAndResetMonthlyLimits(brand);
-  
-  const limits = {
-    starter: 25,
-    professional: 250,
-    enterprise: Infinity
-  };
-  
-  const limit = limits[resetBrand.plan] || 25;
-  if (resetBrand.qrUsedThisMonth >= limit) {
-    return { 
-      allowed: false, 
-      brand: resetBrand, 
-      message: `You've reached your monthly QR limit of ${limit} QRs. Please upgrade your plan to continue or wait until your monthly reset.` 
+  const limitCheck = checkQRLimit(resetBrand);
+
+  if (!limitCheck.allowed) {
+    return {
+      allowed: false,
+      brand: resetBrand,
+      message: limitCheck.message
     };
   }
-  
-  const updatedBrand = {
+
+  const currentQRs = getQRCodes(resetBrand.id).length;
+  const newTotalUsed = Math.max((resetBrand.qrUsed || 0) + 1, currentQRs + 1);
+
+  const updatedBrand: Brand = {
     ...resetBrand,
-    qrUsedThisMonth: resetBrand.qrUsedThisMonth + 1
+    qrUsed: newTotalUsed,
+    qrUsedThisMonth: (resetBrand.qrUsedThisMonth || 0) + 1
   };
   saveBrand(updatedBrand);
   return { allowed: true, brand: updatedBrand };
