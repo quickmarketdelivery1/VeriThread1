@@ -48,9 +48,14 @@ import {
 } from './lib/firebase';
 
 export default function App() {
-  // Initialize storage on first load
+  // Initialize storage on first load & subscribe to storage events for centralized brand sync
   useEffect(() => {
     initStorage();
+    const handleStorage = () => {
+      setBrand(getBrand());
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const [brand, setBrand] = useState(getBrand);

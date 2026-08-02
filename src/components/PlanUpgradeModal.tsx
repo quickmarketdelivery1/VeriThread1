@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  X, Sparkles, Check, ShieldCheck, CreditCard, Tag, ArrowRight, 
-  Building2, Copy, FileText, Send, CheckCircle2 
+  X, Sparkles, Check, ShieldCheck, Building2, Copy, Send, CheckCircle2 
 } from 'lucide-react';
-import { getBrand, upgradeBrandToProfessional, checkCoupon, CouponItem } from '../lib/storage';
+import { getBrand } from '../lib/storage';
 import { createInvoice, updateInvoiceStatus } from '../lib/invoices';
 
 interface PlanUpgradeModalProps {
@@ -13,23 +12,13 @@ interface PlanUpgradeModalProps {
 }
 
 export function PlanUpgradeModal({ isOpen, onClose, onUpgraded }: PlanUpgradeModalProps) {
-  const [brand, setBrand] = useState(() => getBrand());
-  const [paymentMode, setPaymentMode] = useState<'bank' | 'card'>('bank');
+  const [brand] = useState(() => getBrand());
   
   // Bank transfer / invoice state
   const [bankRefInput, setBankRefInput] = useState('');
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
   const [transferSubmittedSuccess, setTransferSubmittedSuccess] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  // Card / Coupon state
-  const [coupon, setCoupon] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<CouponItem | null>(null);
-  const [couponError, setCouponError] = useState('');
-  const [cardNumber, setCardNumber] = useState('4012 8855 9321 0048');
-  const [expiry, setExpiry] = useState('12/28');
-  const [cvv, setCvv] = useState('382');
-  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -39,19 +28,9 @@ export function PlanUpgradeModal({ isOpen, onClose, onUpgraded }: PlanUpgradeMod
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleApplyCoupon = () => {
-    const cp = checkCoupon(coupon);
-    if (cp) {
-      setAppliedCoupon(cp);
-      setCouponError('');
-    } else {
-      setCouponError('Invalid coupon code.');
-    }
-  };
-
   // Handle manual bank transfer invoice creation & confirmation
-  const handleConfirmBankTransfer = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmBankTransfer = (e?: React.FormEvent | React.SyntheticEvent) => {
+    if (e) e.preventDefault();
     setIsSubmittingTransfer(true);
 
     setTimeout(() => {
@@ -76,39 +55,6 @@ export function PlanUpgradeModal({ isOpen, onClose, onUpgraded }: PlanUpgradeMod
     }, 1200);
   };
 
-  // Instant card / coupon upgrade
-  const handleCardUpgrade = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!appliedCoupon || appliedCoupon.type !== 'bypass') {
-      if (cardNumber.length < 15 || expiry.length < 4 || cvv.length < 3) {
-        alert('Please enter valid card details.');
-        return;
-      }
-    }
-
-    setIsLoading(true);
-
-    setTimeout(() => {
-      const discountVal = appliedCoupon ? appliedCoupon.discount : 0;
-      const amountPaid = 25000 * (1 - discountVal / 100);
-
-      const updated = upgradeBrandToProfessional(
-        appliedCoupon ? `coupon-${appliedCoupon.code}` : `pay-${Date.now()}`,
-        amountPaid
-      );
-
-      setBrand(updated);
-      setIsLoading(false);
-      if (onUpgraded) onUpgraded();
-      window.dispatchEvent(new Event('storage'));
-      onClose();
-    }, 1500);
-  };
-
-  const originalPrice = 25000;
-  const discountVal = appliedCoupon ? appliedCoupon.discount : 0;
-  const finalPrice = originalPrice * (1 - discountVal / 100);
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full overflow-hidden relative flex flex-col my-8 max-h-[90vh]">
@@ -116,8 +62,14 @@ export function PlanUpgradeModal({ isOpen, onClose, onUpgraded }: PlanUpgradeMod
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-[#0F5132] to-[#145A32] text-white p-6 relative shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 p-1.5 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all"
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+            className="absolute right-4 top-4 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer touch-manipulation z-10"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -163,228 +115,116 @@ export function PlanUpgradeModal({ isOpen, onClose, onUpgraded }: PlanUpgradeMod
             </div>
           </div>
 
-          {/* Payment Method Switcher Tabs */}
-          <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-2xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setPaymentMode('bank')}
-              className={`py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                paymentMode === 'bank' ? 'bg-white text-[#0F5132] shadow-xs' : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" /> Manual Bank Transfer
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMode('card')}
-              className={`py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                paymentMode === 'card' ? 'bg-white text-[#0F5132] shadow-xs' : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" /> Instant Card / Coupon
-            </button>
-          </div>
-
-          {/* Option A: Bank Transfer / Manual Invoice Flow */}
-          {paymentMode === 'bank' ? (
-            <div className="flex flex-col gap-4">
-              <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl flex flex-col gap-3 text-xs text-amber-950">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold uppercase text-[10px] text-amber-800 tracking-wider">
-                    Official Payment Details
-                  </span>
-                  <span className="font-extrabold font-mono text-sm text-[#0F5132]">
-                    ₦25,000 / month
-                  </span>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-amber-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div>
-                    <span className="text-gray-400 text-[10px] font-bold block uppercase">Bank Name</span>
-                    <span className="font-bold text-gray-900 block mt-0.5">GTBank / VeriThread</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 text-[10px] font-bold block uppercase">Account Number</span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="font-mono font-bold text-gray-900">0123456789</span>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard('0123456789', 'acc')}
-                        className="text-gray-400 hover:text-gray-700 p-0.5"
-                      >
-                        {copiedField === 'acc' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 text-[10px] font-bold block uppercase">Account Name</span>
-                    <span className="font-bold text-gray-900 block mt-0.5">VeriThread Tech Ltd</span>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-amber-900 leading-relaxed">
-                  Your official invoice will be generated automatically upon submission. Once payment is confirmed by admin, your Professional plan is activated immediately.
-                </p>
+          {/* Bank Transfer / Manual Invoice Flow */}
+          <div className="flex flex-col gap-4">
+            <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl flex flex-col gap-3 text-xs text-amber-950">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold uppercase text-[10px] text-amber-800 tracking-wider flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5" /> Official Bank Transfer Details
+                </span>
+                <span className="font-extrabold font-mono text-sm text-[#0F5132]">
+                  ₦25,000 / month
+                </span>
               </div>
 
-              {transferSubmittedSuccess ? (
-                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-xs text-emerald-900 font-medium flex flex-col gap-2 animate-fade-in">
-                  <div className="flex items-center gap-2 font-bold text-emerald-950">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    <span>Payment Confirmation Sent!</span>
-                  </div>
-                  <p className="text-emerald-800 text-[11px]">
-                    {transferSubmittedSuccess}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="mt-2 w-full py-2.5 bg-[#0F5132] text-white rounded-xl font-bold cursor-pointer hover:bg-[#145A32] text-center"
-                  >
-                    Done & Close
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleConfirmBankTransfer} className="flex flex-col gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                      Transaction Reference / Sender Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. GTB Transfer Ref 884920 or Sender Name"
-                      value={bankRefInput}
-                      onChange={(e) => setBankRefInput(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingTransfer}
-                    className="w-full bg-[#0F5132] hover:bg-[#145A32] text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmittingTransfer ? (
-                      <span>Generating Invoice & Confirming...</span>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        <span>Confirm I Have Made Payment</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : (
-            /* Option B: Card or Coupon Instant Upgrade */
-            <form onSubmit={handleCardUpgrade} className="flex flex-col gap-4">
-              
-              {/* Price Box */}
-              <div className="bg-[#0F5132]/5 p-4 rounded-2xl border border-[#0F5132]/15 flex items-center justify-between">
+              <div className="bg-white p-3 rounded-xl border border-amber-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <p className="text-xs font-extrabold text-[#0F5132]">Professional Monthly Pass</p>
-                  <p className="text-[11px] text-gray-500">Auto-renews monthly. Cancel anytime.</p>
+                  <span className="text-gray-400 text-[10px] font-bold block uppercase">Bank Name</span>
+                  <span className="font-bold text-gray-900 block mt-0.5">GTBank</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-xl font-extrabold text-[#0F5132]">
-                    {appliedCoupon && appliedCoupon.type === 'bypass' 
-                      ? 'FREE' 
-                      : `₦${finalPrice.toLocaleString()}`}
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-bold block">/ month</span>
+                <div>
+                  <span className="text-gray-400 text-[10px] font-bold block uppercase">Account Number</span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="font-mono font-bold text-gray-900">0123456789</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard('0123456789', 'acc')}
+                      onTouchEnd={(e) => {
+                        e.preventDefault();
+                        copyToClipboard('0123456789', 'acc');
+                      }}
+                      className="text-gray-400 hover:text-gray-700 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer touch-manipulation"
+                      aria-label="Copy account number"
+                    >
+                      {copiedField === 'acc' ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-400 text-[10px] font-bold block uppercase">Account Name</span>
+                  <span className="font-bold text-gray-900 block mt-0.5">VeriThread Tech Ltd</span>
                 </div>
               </div>
 
-              {/* Coupon Code Section */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                  <Tag className="w-3.5 h-3.5 text-gray-400" /> Promo / Coupon Code
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. FOUNDER15"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    disabled={isLoading || !!appliedCoupon}
-                    className="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono uppercase tracking-wider focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    disabled={isLoading || !!appliedCoupon || !coupon.trim()}
-                    className="px-4 py-2.5 bg-[#0F5132] text-white hover:bg-[#145A32] disabled:opacity-40 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Apply
-                  </button>
-                </div>
-                {appliedCoupon && (
-                  <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Coupon '{appliedCoupon.code}' applied! ({appliedCoupon.discount}% OFF)
-                  </p>
-                )}
-                {couponError && (
-                  <p className="text-xs text-rose-600 font-medium">{couponError}</p>
-                )}
-              </div>
+              <p className="text-[11px] text-amber-900 leading-relaxed">
+                Please transfer ₦25,000 to the GTBank account above and enter your payment reference or sender name below. An official invoice will be generated and verified by admin.
+              </p>
+            </div>
 
-              {/* Card Simulation Inputs (if not 100% bypass) */}
-              {(!appliedCoupon || appliedCoupon.type !== 'bypass') && (
-                <div className="flex flex-col gap-2.5 pt-1">
-                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                    <CreditCard className="w-3.5 h-3.5 text-gray-400" /> Payment Card
+            {transferSubmittedSuccess ? (
+              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-xs text-emerald-900 font-medium flex flex-col gap-2 animate-fade-in">
+                <div className="flex items-center gap-2 font-bold text-emerald-950">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Payment Confirmation Sent!</span>
+                </div>
+                <p className="text-emerald-800 text-[11px]">
+                  {transferSubmittedSuccess}
+                </p>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    onClose();
+                  }}
+                  className="mt-2 w-full py-3 bg-[#0F5132] text-white rounded-xl font-bold cursor-pointer hover:bg-[#145A32] text-center min-h-[44px] touch-manipulation flex items-center justify-center"
+                >
+                  Done & Close
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmBankTransfer} className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                    Transaction Reference / Sender Name
                   </label>
                   <input
                     type="text"
-                    placeholder="Card Number"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono focus:outline-none"
+                    placeholder="e.g. GTB Transfer Ref 884920 or Sender Name"
+                    value={bankRefInput}
+                    onChange={(e) => setBankRefInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono focus:outline-none min-h-[44px]"
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      value={expiry}
-                      onChange={(e) => setExpiry(e.target.value)}
-                      className="px-3.5 py-2 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono focus:outline-none text-center"
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVV"
-                      value={cvv}
-                      onChange={(e) => setCvv(e.target.value)}
-                      className="px-3.5 py-2 bg-gray-50 border border-gray-200 focus:border-[#0F5132] focus:bg-white rounded-xl text-xs font-mono focus:outline-none text-center"
-                    />
-                  </div>
                 </div>
-              )}
 
-              {/* Upgrade Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 bg-[#0F5132] hover:bg-[#145A32] text-white py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all shadow-lg hover:shadow-xl cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Activating Subscription...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Instant Activate Professional Plan</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBankTransfer}
+                  onTouchEnd={(e) => {
+                    if (!isSubmittingTransfer) {
+                      e.preventDefault();
+                      handleConfirmBankTransfer(e);
+                    }
+                  }}
+                  disabled={isSubmittingTransfer}
+                  className="w-full bg-[#0F5132] hover:bg-[#145A32] text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 min-h-[44px] touch-manipulation"
+                >
+                  {isSubmittingTransfer ? (
+                    <span>Generating Invoice & Confirming...</span>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Confirm I Have Made Payment</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
 
-              <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Instant Feature Activation & Printable Receipt
-              </p>
-            </form>
-          )}
+          <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-emerald-600" /> Verified Manual Bank Transfer & Printable Invoice Receipt
+          </p>
 
         </div>
       </div>

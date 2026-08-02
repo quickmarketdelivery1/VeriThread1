@@ -204,21 +204,62 @@ export function isPreviewModeReadOnly(): boolean {
 export function getBrand(): Brand {
   initStorage();
   const data = localStorage.getItem(KEYS.BRAND);
+  let brandObj: Brand;
+
   if (data) {
     try {
       const parsed = JSON.parse(data);
       if (parsed && typeof parsed === 'object') {
-        return {
+        brandObj = {
+          ...sampleBrand,
           ...parsed,
           logoUrl: typeof parsed.logoUrl === 'string' ? parsed.logoUrl : ''
         };
+      } else {
+        brandObj = { ...sampleBrand, logoUrl: '' };
+      }
+    } catch (e) {
+      brandObj = { ...sampleBrand, logoUrl: '' };
+    }
+  } else {
+    brandObj = { ...sampleBrand, logoUrl: '' };
+  }
+
+  // Ensure vt_auth_user and single source of truth stay aligned
+  if (typeof window !== 'undefined') {
+    try {
+      const authUserStr = localStorage.getItem('vt_auth_user');
+      if (authUserStr) {
+        const u = JSON.parse(authUserStr);
+        let updated = false;
+        if (u.brandName && (!brandObj.name || brandObj.name === 'Atelier Store')) {
+          brandObj.name = u.brandName;
+          updated = true;
+        }
+        if (u.brandType && !brandObj.type) {
+          brandObj.type = u.brandType;
+          updated = true;
+        }
+        if (u.brandDescription && !brandObj.description) {
+          brandObj.description = u.brandDescription;
+          updated = true;
+        }
+        if (u.brandLocation && !brandObj.location) {
+          brandObj.location = u.brandLocation;
+          updated = true;
+        }
+        if (u.plan && brandObj.plan !== u.plan.toLowerCase()) {
+          brandObj.plan = u.plan.toLowerCase() as any;
+          updated = true;
+        }
+        if (updated) {
+          localStorage.setItem(KEYS.BRAND, JSON.stringify(brandObj));
+        }
       }
     } catch (e) {}
   }
-  return {
-    ...sampleBrand,
-    logoUrl: ''
-  };
+
+  return brandObj;
 }
 
 export function saveBrand(brand: Brand) {
@@ -244,6 +285,10 @@ export function saveBrand(brand: Brand) {
       localStorage.setItem('vt_auth_user', JSON.stringify(parsed));
     }
   } catch (e) {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('storage'));
+  }
 
   saveBrandFirestore(cleanBrand).catch(err => console.warn('Firestore sync brand warning:', err));
   if (cleanBrand.id) {

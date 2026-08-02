@@ -18,29 +18,62 @@ interface DigitalPassportProps {
 }
 
 export default function DigitalPassport({ productId, onNavigate }: DigitalPassportProps) {
-  const localProduct = getProductById(productId);
-  const [remoteProduct, setRemoteProduct] = useState<Product | null>(null);
-  const product = localProduct || remoteProduct;
+  const [product, setProduct] = useState<Product | null>(() => {
+    return getProductById(productId) || null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return !getProductById(productId);
+  });
+
   const brand = getBrand();
-  const brandName = brand.name?.trim() || 'Verified Atelier';
-  const brandLocation = brand.location?.trim() || 'Atelier Workshop';
+  const brandName = brand.name;
+  const brandLocation = brand.location || '';
 
   useEffect(() => {
-    if (!localProduct && productId) {
-      fetchProductByIdFirestore(productId).then(p => {
-        if (p) {
-          setRemoteProduct(p);
-          try {
-            const list = getProducts();
-            if (!list.some(item => item.id === p.id)) {
-              list.push(p);
-              localStorage.setItem('vt_products', JSON.stringify(list));
-            }
-          } catch (e) {}
-        }
-      });
+    let isMounted = true;
+    const local = getProductById(productId);
+
+    if (local) {
+      setProduct(local);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
     }
-  }, [productId, localProduct]);
+
+    if (productId) {
+      fetchProductByIdFirestore(productId)
+        .then(p => {
+          if (!isMounted) return;
+          if (p) {
+            setProduct(p);
+            try {
+              const list = getProducts();
+              const existingIndex = list.findIndex(item => item.id === p.id);
+              if (existingIndex >= 0) {
+                list[existingIndex] = p;
+              } else {
+                list.push(p);
+              }
+              localStorage.setItem('vt_products', JSON.stringify(list));
+            } catch (e) {}
+          }
+        })
+        .catch(err => {
+          console.warn('[DigitalPassport] Remote fetch notice:', err);
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        });
+    } else {
+      setIsLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [productId]);
 
   const [activeTab, setActiveTab] = useState<'story' | 'details' | 'authenticity' | 'warranty'>('story');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -99,6 +132,20 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
     }, 4000);
     return () => clearInterval(interval);
   }, [allImages.length]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex flex-col justify-center items-center p-6 text-center font-sans">
+        <div className="bg-white border border-gray-200 p-8 rounded-3xl max-w-sm shadow-xl flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-[#0F5132] border-t-transparent rounded-full animate-spin" />
+          <h2 className="font-display font-semibold text-lg text-gray-900">Authenticating Digital Passport...</h2>
+          <p className="text-gray-500 text-xs">
+            Connecting to VeriThread registry for ID: <code className="font-mono bg-gray-100 px-1 rounded">{productId}</code>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!product) {
     return (

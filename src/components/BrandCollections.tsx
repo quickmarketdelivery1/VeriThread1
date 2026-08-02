@@ -3,8 +3,9 @@ import {
   Folder, ArrowLeft, ShieldCheck, ExternalLink, Sparkles, Grid, Layers, Search, CheckCircle, Tag, ChevronRight, Globe, MessageSquare 
 } from 'lucide-react';
 import { getBrand, getCollectionsWithProducts, getProductsByBrand, syncProductsWithRemote } from '../lib/storage';
-import { fetchProductsFirestore } from '../lib/firebase';
-import { Collection, Product } from '../types';
+import { fetchProductsFirestore, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { Collection, Product, Brand } from '../types';
 import ProBadge from './ProBadge';
 
 interface BrandCollectionsProps {
@@ -13,7 +14,8 @@ interface BrandCollectionsProps {
 }
 
 export default function BrandCollections({ onNavigate, brandId }: BrandCollectionsProps) {
-  const brand = getBrand();
+  const [brand, setBrand] = useState<Brand>(() => getBrand());
+
   const targetBrandId = brandId || brand.id;
 
   const [allBrandProducts, setAllBrandProducts] = useState<Product[]>([]);
@@ -22,6 +24,8 @@ export default function BrandCollections({ onNavigate, brandId }: BrandCollectio
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = () => {
+    const b = getBrand();
+    setBrand(b);
     const prods = getProductsByBrand(targetBrandId).filter(p => p.isPublished !== false);
     const cols = getCollectionsWithProducts(targetBrandId);
     setAllBrandProducts(prods);
@@ -56,7 +60,7 @@ export default function BrandCollections({ onNavigate, brandId }: BrandCollectio
   });
 
   const activeCollectionName = selectedCollectionId === 'all' 
-    ? 'All Atelier Collections' 
+    ? (brand.name ? `All ${brand.name} Collections` : 'All Collections')
     : collectionsWithProducts.find(c => c.id === selectedCollectionId)?.name || 'Collection';
 
   return (
@@ -82,7 +86,7 @@ export default function BrandCollections({ onNavigate, brandId }: BrandCollectio
               {brand.logoUrl ? (
                 <img 
                   src={brand.logoUrl} 
-                  alt={brand.name} 
+                  alt={brand.name || 'Brand Logo'} 
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg bg-white shrink-0"
                   referrerPolicy="no-referrer"
                 />
@@ -95,13 +99,19 @@ export default function BrandCollections({ onNavigate, brandId }: BrandCollectio
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-display font-bold text-xl sm:text-2xl text-white uppercase tracking-tight">
-                    {brand.name || 'Atelier Store'}
+                    {brand.name}
                   </h1>
                   <ProBadge plan={brand.plan} size={18} />
                 </div>
-                <p className="text-xs text-white/80 font-medium mt-1">
-                  {brand.slogan || 'Digital Product Passport Atelier'}
-                </p>
+                {brand.slogan ? (
+                  <p className="text-xs text-white/80 font-medium mt-1">
+                    {brand.slogan}
+                  </p>
+                ) : brand.name ? (
+                  <p className="text-xs text-white/80 font-medium mt-1">
+                    {brand.name} Digital Product Passports
+                  </p>
+                ) : null}
                 {brand.location && (
                   <span className="text-[10px] text-emerald-200/90 font-mono uppercase tracking-wider mt-1 block">
                     📍 {brand.location}

@@ -37,6 +37,12 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
   const totalLikes = products.reduce((acc, p) => acc + (p.likeCount || 0), 0);
   const regRate = totalScans > 0 ? Math.round((totalOwners / totalScans) * 100) : 0;
 
+  React.useEffect(() => {
+    const handleStorage = () => refreshData();
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   // Filter out recent activities to show on the dashboard (first 5)
   const recentActivities = activities.slice(0, 5);
 
@@ -51,12 +57,12 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
     }
   })();
 
-  const fullName = userObj?.fullName || userObj?.name || brand.name || '';
-  const displayBrandName = brand.name || userObj?.brandName || '';
-  const displayBrandType = brand.type || userObj?.brandType || '';
-  const displayBrandDesc = brand.description || userObj?.brandDescription || '';
-  const displayBrandLocation = brand.location || userObj?.brandLocation || '';
-  const displayPlan = (brand.plan || userObj?.plan || 'Starter').charAt(0).toUpperCase() + (brand.plan || userObj?.plan || 'Starter').slice(1);
+  const fullName = userObj?.fullName || userObj?.name || '';
+  const displayBrandName = brand.name;
+  const displayBrandType = brand.type || '';
+  const displayBrandDesc = brand.description || '';
+  const displayBrandLocation = brand.location || '';
+  const displayPlan = (brand.plan || 'starter').charAt(0).toUpperCase() + (brand.plan || 'starter').slice(1);
 
   // QR usage calculation for UI display
   const totalQrCount = qrcodes.length;
