@@ -31,7 +31,9 @@ declare global {
 
 const PAYSTACK_SCRIPT_URL = 'https://js.paystack.co/v1/inline.js';
 
-export const PAYSTACK_PUBLIC_KEY = 'pk_test_verithread_09812347128937129841';
+export const PAYSTACK_PUBLIC_KEY = 
+  (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string) || 
+  'pk_test_verithread_09812347128937129841';
 
 /**
  * Dynamically loads the Paystack Inline JS script

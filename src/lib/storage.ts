@@ -415,6 +415,10 @@ export function clearUserDataOnLogout() {
   localStorage.removeItem('vt_signup_metadata');
   localStorage.removeItem('vt_fresh_slate');
   localStorage.removeItem('vt_has_dev_access');
+  localStorage.removeItem('vt_invoices');
+  localStorage.removeItem('vt_reminder_logs');
+  localStorage.removeItem('vt_liked_products');
+  localStorage.removeItem('vt_paystack_transactions');
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.clear();
   }
@@ -696,7 +700,9 @@ export function getQRCodes(explicitBrandId?: string): QRCode[] {
   const targetBrandId = explicitBrandId || currentBrand.id;
 
   if (isUserRegisteredSession()) {
-    return codes.filter(q => q && (q.brandId === targetBrandId || !q.brandId));
+    const products = getProducts(targetBrandId);
+    const productIds = new Set(products.map(p => p.id));
+    return codes.filter(q => q && (q.brandId === targetBrandId || (q.productId && productIds.has(q.productId))));
   }
   return codes.length > 0 ? codes : sampleQRCodes;
 }
@@ -707,12 +713,13 @@ export function getOrCreateQRCode(productId: string): QRCode {
   const brand = getBrand();
   const targetBrandId = product?.brandId || brand.id;
 
-  const codes = getQRCodes();
+  const codes = getQRCodes(targetBrandId);
   let code = codes.find(q => q.productId === productId);
   if (!code) {
     code = {
       id: `qr-${productId}`,
       productId: productId,
+      brandId: targetBrandId,
       code: `https://verithread.net/passport/${productId}`,
       scanCount: 0,
       createdAt: new Date().toISOString(),
@@ -721,6 +728,8 @@ export function getOrCreateQRCode(productId: string): QRCode {
     codes.push(code);
     localStorage.setItem(KEYS.QRCODES, JSON.stringify(codes));
     saveQRCodeFirestore(code, targetBrandId).catch(err => console.warn('[Storage] Firestore sync qrcode warning:', err));
+  } else if (!code.brandId) {
+    code.brandId = targetBrandId;
   }
   return code;
 }
@@ -731,18 +740,21 @@ export function recordQRCodeScan(productId: string, explicitBrandId?: string) {
   const brand = getBrand();
   const targetBrandId = explicitBrandId || product?.brandId || brand.id;
 
-  const codes = getQRCodes();
+  const codes = getQRCodes(targetBrandId);
   let code = codes.find(q => q.productId === productId);
   if (!code) {
     code = {
       id: `qr-${productId}`,
       productId: productId,
+      brandId: targetBrandId,
       code: `https://verithread.net/passport/${productId}`,
       scanCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     codes.push(code);
+  } else {
+    code.brandId = targetBrandId;
   }
 
   code.scanCount = (code.scanCount || 0) + 1;

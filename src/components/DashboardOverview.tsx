@@ -444,46 +444,37 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
               <h3 className="font-display text-sm font-semibold text-[#0F5132] uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-amber-500" /> Today's Growth Opportunities
               </h3>
-              <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-bold">Action Suggested</span>
+              {(totalScans - totalOwners) > 0 && (
+                <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-bold">Action Suggested</span>
+              )}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
-                <span className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5">
-                  <AlertCircle className="w-4 h-4" />
-                </span>
-                <div>
-                  <h4 className="font-bold text-xs text-gray-900">18 Scanned Visitors Unregistered</h4>
-                  <p className="text-[10px] text-gray-500 mt-1 leading-normal">
-                    18 shoppers inspected digital passports today but haven't registered their garment warranties.
-                  </p>
-                  <button
-                    onClick={() => setOpportunityNotice("WhatsApp Retargeting Reminder")}
-                    className="mt-3 bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 h-7 rounded-full text-[10px] font-bold cursor-pointer transition-all self-start"
-                  >
-                    Ping WhatsApp Reminder
-                  </button>
+            {(totalScans - totalOwners) > 0 ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
+                  <span className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5">
+                    <AlertCircle className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-xs text-gray-900">{Math.max(0, totalScans - totalOwners)} Scanned Visitors Unregistered</h4>
+                    <p className="text-[10px] text-gray-500 mt-1 leading-normal">
+                      {Math.max(0, totalScans - totalOwners)} shoppers inspected digital passports but haven't registered their garment warranties yet.
+                    </p>
+                    <button
+                      onClick={() => setOpportunityNotice("WhatsApp Retargeting Reminder")}
+                      className="mt-3 bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 h-7 rounded-full text-[10px] font-bold cursor-pointer transition-all self-start"
+                    >
+                      Ping WhatsApp Reminder
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-start gap-3">
-                <span className="p-2 rounded-lg bg-emerald-50 text-[#0F5132] shrink-0 mt-0.5">
-                  <Calendar className="w-4 h-4" />
-                </span>
-                <div>
-                  <h4 className="font-bold text-xs text-gray-900">3 Registered Birthdays This Week</h4>
-                  <p className="text-[10px] text-gray-500 mt-1 leading-normal">
-                    3 registered brand owners are celebrating this week. Delight them with a custom brand token.
-                  </p>
-                  <button
-                    onClick={() => setOpportunityNotice("Birthday Congratulatory Gift Coupon")}
-                    className="mt-3 bg-[#0F5132] hover:bg-[#145A32] text-white px-3.5 h-7 rounded-full text-[10px] font-bold cursor-pointer transition-all self-start"
-                  >
-                    Dispatch Gift Coupon
-                  </button>
-                </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center gap-1">
+                <Sparkles className="w-5 h-5 text-gray-400 mb-1" />
+                <span className="font-medium text-gray-600">No activity yet. Start sharing your QR codes to see insights here.</span>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Main layout (Split activity & metrics details) */}
