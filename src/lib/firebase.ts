@@ -16,14 +16,25 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { Brand, Product, Collection as CollectionType, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, Report } from '../types';
 import { clearUserDataOnLogout } from './storage';
 
-// Firebase Config with environment variables or safe fallbacks
+// Firebase Config strictly loaded from environment variables
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
+const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
+const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+
+if (!apiKey || !projectId) {
+  throw new Error('Firebase configuration error: Missing environment variables. Please set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in .env file.');
+}
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyB19vNxPc1T65_dSVrxOe9quKsVsRCYca8',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'verithread-fde6c.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'verithread-fde6c',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'verithread-fde6c.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '729232977904',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:729232977904:web:c12f40bb5a8c72b9d1f735',
+  apiKey,
+  authDomain,
+  projectId,
+  storageBucket,
+  messagingSenderId,
+  appId,
 };
 
 // Initialize Firebase App
