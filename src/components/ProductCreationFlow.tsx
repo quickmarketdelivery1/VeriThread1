@@ -581,7 +581,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
   }
 
   const currentProductsCount = getProducts().length;
-  const isProductLimitReached = brand.plan === 'starter' && currentProductsCount >= 3;
+  const isProductLimitReached = brand.plan === 'starter' && currentProductsCount >= 5;
 
   if (isProductLimitReached) {
     return (
@@ -595,7 +595,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
           </span>
           <h2 className="font-display font-extrabold text-2xl text-gray-900 mt-3 tracking-tight">Upgrade to Professional</h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-2 leading-relaxed max-w-md mx-auto">
-            Your brand is currently on the <strong>Starter Tier</strong>, which strictly limits you to <strong>3 products</strong> on the registry. You have reached this limit. Upgrade to unlock unlimited products, multi-angle images, premium AI, and high-tier QR quotas.
+            Your brand is currently on the <strong>Starter Tier</strong>, which strictly limits you to <strong>5 products</strong> on the registry. You have reached this limit. Upgrade to unlock unlimited products, multi-angle images, premium AI, and high-tier QR quotas.
           </p>
         </div>
 
@@ -1536,7 +1536,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
                 {isUpgrading ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Authorizing Secure Paystack...
+                    Authorizing Upgrade...
                   </>
                 ) : (
                   <>
@@ -1547,7 +1547,7 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
               </button>
 
               <p className="text-[9px] text-center text-gray-400 max-w-xs mx-auto leading-relaxed">
-                🔒 Secured by Paystack and Stripe. Refundable 14-day premium guarantee.
+                🔒 Verified bank transfer & coupon authorization. 14-day guarantee.
               </p>
             </form>
 

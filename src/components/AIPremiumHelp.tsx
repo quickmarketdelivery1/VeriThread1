@@ -900,7 +900,7 @@ Brand Name: ${brand.name}`;
                 {isUpgrading ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Authorizing Secure Paystack...
+                    Authorizing Upgrade...
                   </>
                 ) : (
                   <>
@@ -911,7 +911,7 @@ Brand Name: ${brand.name}`;
               </button>
 
               <p className="text-[9px] text-center text-gray-400 max-w-xs mx-auto leading-relaxed">
-                🔒 Secured by Paystack and Stripe. Refundable 14-day premium guarantee.
+                🔒 Verified bank transfer & coupon authorization. 14-day guarantee.
               </p>
             </form>
 

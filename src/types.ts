@@ -192,7 +192,7 @@ export interface Invoice {
   invoiceDate: string;
   dueDate: string;
   paidAt?: string;
-  paymentMethod?: string; // 'Bank Transfer' | 'Paystack' | 'Coupon' | 'Manual Admin'
+  paymentMethod?: string; // 'Bank Transfer' | 'Coupon' | 'Manual Admin'
   paymentProofRef?: string;
   notes?: string;
   createdAt: string;

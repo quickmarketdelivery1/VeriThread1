@@ -3,7 +3,7 @@ import { Settings, Save, AlertTriangle, ShieldAlert, CheckCircle2, RotateCcw, Tr
 import { Brand } from '../types';
 import { getBrand, saveBrand, resetToSampleData, clearStorage } from '../lib/storage';
 import ProBadge from './ProBadge';
-import { PaystackCheckoutModal } from './PaystackCheckoutModal';
+import { PlanUpgradeModal } from './PlanUpgradeModal';
 
 const ToggleSwitch = ({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) => (
   <button
@@ -44,12 +44,11 @@ export default function BrandSettings({ onRefresh }: BrandSettingsProps) {
   const [showSerial, setShowSerial] = useState(true);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [showPaystackModal, setShowPaystackModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const handlePlanSelectChange = (newPlan: 'starter' | 'professional' | 'enterprise') => {
     if (newPlan === 'professional' && brand.plan !== 'professional' && brand.plan !== 'enterprise') {
-      // Trigger Paystack payment flow for upgrading to Professional plan
-      setShowPaystackModal(true);
+      setShowUpgradeModal(true);
     } else {
       setPlan(newPlan);
     }
@@ -516,31 +515,14 @@ export default function BrandSettings({ onRefresh }: BrandSettingsProps) {
 
       </div>
 
-      {showPaystackModal && (
-        <PaystackCheckoutModal
-          email={supportEmail || brand.supportEmail || 'billing@verithread.com'}
-          amount={25000}
-          planName="Professional Plan"
-          onSuccess={(ref, amt) => {
-            const updated = {
-              ...brand,
-              plan: 'professional' as const,
-              paystackReference: ref,
-              paidAmount: amt,
-              updatedAt: new Date().toISOString()
-            };
-            saveBrand(updated);
-            setPlan('professional');
-            setShowPaystackModal(false);
-            onRefresh();
-            alert(`Payment verified! Reference: ${ref}. Brand successfully upgraded to Professional Plan.`);
-          }}
-          onCancel={() => {
-            setShowPaystackModal(false);
-            setPlan(brand.plan || 'starter');
-          }}
-        />
-      )}
+      <PlanUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgraded={() => {
+          setPlan('professional');
+          onRefresh();
+        }}
+      />
 
     </div>
   );

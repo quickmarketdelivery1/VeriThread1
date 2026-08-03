@@ -3,7 +3,6 @@ import { Mail, User, Lock, Building2, MapPin, Tag, ShieldCheck, CheckCircle, Arr
 import { registerUser } from '../lib/firebase';
 import { clearUserDataOnLogout } from '../lib/storage';
 import { validateCouponCode, CouponValidationResult } from '../lib/coupons';
-import { PaystackCheckoutModal } from './PaystackCheckoutModal';
 
 interface SignupPageProps {
   onNavigate: (route: string) => void;
@@ -55,8 +54,6 @@ export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPagePr
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const [showPaystackModal, setShowPaystackModal] = useState(false);
-  const [paystackAmount, setPaystackAmount] = useState(25000);
   const [pendingSignupPayload, setPendingSignupPayload] = useState<any>(null);
 
   const executeFinalSignup = async (payload: any) => {
@@ -202,13 +199,7 @@ export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPagePr
       hasDevAccess: hasDevAccess || undefined
     };
 
-    if (isProPlan && finalPrice > 0) {
-      setPendingSignupPayload(signupPayload);
-      setPaystackAmount(finalPrice);
-      setShowPaystackModal(true);
-    } else {
-      await executeFinalSignup(signupPayload);
-    }
+    await executeFinalSignup(signupPayload);
   };
 
   if (isSubmitted) {
@@ -571,26 +562,6 @@ export default function SignupPage({ onNavigate, onSignupSuccess }: SignupPagePr
             </button>
           </p>
         </div>
-
-        {showPaystackModal && pendingSignupPayload && (
-          <PaystackCheckoutModal
-            email={pendingSignupPayload.email}
-            amount={paystackAmount}
-            planName={pendingSignupPayload.plan}
-            couponCode={pendingSignupPayload.couponCode}
-            onSuccess={async (ref, amt) => {
-              setShowPaystackModal(false);
-              await executeFinalSignup({
-                ...pendingSignupPayload,
-                paystackReference: ref,
-                paidAmount: amt
-              });
-            }}
-            onCancel={() => {
-              setShowPaystackModal(false);
-            }}
-          />
-        )}
 
       </div>
     </div>

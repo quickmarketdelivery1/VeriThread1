@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, QrCode, Globe, ArrowUpRight, ShieldCheck, UserCheck, Smartphone, Eye, RefreshCw, AlertCircle, Calendar, Sparkles, CheckCircle, Heart, Lock, Zap } from 'lucide-react';
 import { Product, Collection, QRCode, Ownership, AnalyticsEvent } from '../types';
-import { getProducts, getQRCodes, getOwnerships, getAnalyticsEvents, getBrand, checkQRLimit, checkSubscriptionExpiry } from '../lib/storage';
+import { getProducts, getQRCodes, getOwnerships, getAnalyticsEvents, getBrand, checkQRLimit, checkSubscriptionExpiry, syncProductsWithRemote } from '../lib/storage';
+import { fetchProductsFirestore } from '../lib/firebase';
 import ProBadge from './ProBadge';
 import { PlanUpgradeModal } from './PlanUpgradeModal';
 
@@ -14,14 +15,18 @@ interface DashboardOverviewProps {
 export default function DashboardOverview({ brandName, onNavigate, isDemo }: DashboardOverviewProps) {
   const [brand, setBrand] = useState(() => getBrand());
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const products = getProducts();
-  const qrcodes = getQRCodes();
-  const ownerships = getOwnerships();
-  const activities = getAnalyticsEvents();
+  const [products, setProducts] = useState<Product[]>(() => getProducts());
+  const [qrcodes, setQrcodes] = useState<QRCode[]>(() => getQRCodes());
+  const [ownerships, setOwnerships] = useState<Ownership[]>(() => getOwnerships());
+  const [activities, setActivities] = useState<AnalyticsEvent[]>(() => getAnalyticsEvents());
   const [opportunityNotice, setOpportunityNotice] = useState<string | null>(null);
 
   const refreshData = () => {
     setBrand(getBrand());
+    setProducts(getProducts());
+    setQrcodes(getQRCodes());
+    setOwnerships(getOwnerships());
+    setActivities(getAnalyticsEvents());
   };
 
   // Plan Status & Expiry Logic
@@ -38,8 +43,29 @@ export default function DashboardOverview({ brandName, onNavigate, isDemo }: Das
   const regRate = totalScans > 0 ? Math.round((totalOwners / totalScans) * 100) : 0;
 
   React.useEffect(() => {
+    refreshData();
     const handleStorage = () => refreshData();
     window.addEventListener('storage', handleStorage);
+
+    // Also fetch remote products for active brand ID
+    let activeBrandId = brand.id;
+    try {
+      const authUserStr = localStorage.getItem('vt_auth_user');
+      if (authUserStr) {
+        const u = JSON.parse(authUserStr);
+        if (u.uid) activeBrandId = u.uid;
+      }
+    } catch (e) {}
+
+    if (activeBrandId) {
+      fetchProductsFirestore(activeBrandId).then(remoteProds => {
+        if (remoteProds && remoteProds.length > 0) {
+          const synced = syncProductsWithRemote(remoteProds, activeBrandId);
+          setProducts(synced);
+        }
+      }).catch(err => console.warn('[DashboardOverview] Fetch products warning:', err));
+    }
+
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
