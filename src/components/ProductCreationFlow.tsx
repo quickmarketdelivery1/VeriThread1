@@ -473,10 +473,13 @@ export default function ProductCreationFlow({ onNavigate, onRefresh }: ProductCr
       console.log('[DEBUG] Calling saveProduct with product:', newProduct);
       saveProduct(newProduct);
 
-      console.log('[DEBUG] Calling saveProductFirestore with product:', newProduct);
-      saveProductFirestore(newProduct).catch(fsErr => {
-        console.warn('[DEBUG] saveProductFirestore background notice:', fsErr);
-      });
+      try {
+        console.log('[DEBUG] Calling saveProductFirestore with product:', newProduct);
+        await saveProductFirestore(newProduct);
+        console.log('[DEBUG] saveProductFirestore resolved successfully');
+      } catch (fsErr) {
+        console.warn('[DEBUG] saveProductFirestore notice:', fsErr);
+      }
 
       console.log('[DEBUG] Setting createdProductId and setIsSuccess(true):', uniqueId);
       setCreatedProductId(uniqueId);

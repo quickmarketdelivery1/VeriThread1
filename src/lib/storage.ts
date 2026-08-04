@@ -571,8 +571,23 @@ export function getCollectionsWithProducts(brandId?: string): (Collection & { pr
 }
 
 export function getProductById(id: string): Product | undefined {
+  if (!id) return undefined;
+  const cleanId = id.replace(/^#\/?/, '').replace(/^passport\//, '').trim();
+  
+  // First search raw localStorage products to support cross-brand or public views
+  try {
+    const raw = localStorage.getItem(KEYS.PRODUCTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const found = parsed.find(p => p && (p.id === cleanId || p.id === id));
+        if (found) return found;
+      }
+    }
+  } catch (e) {}
+
   const products = getProducts();
-  return products.find(p => p.id === id);
+  return products.find(p => p && (p.id === cleanId || p.id === id));
 }
 
 export function syncProductsWithRemote(fsProducts: Product[], brandId: string): Product[] {

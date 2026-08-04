@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Product, Brand, Ownership, Customer } from '../types';
 import { getProductById, getBrand, registerWarranty, getOwnerships, recordQRCodeScan, getProducts, getProductsByBrand, isProductLiked, toggleProductLike, getCustomers, isPreviewModeReadOnly } from '../lib/storage';
-import { fetchProductByIdFirestore } from '../lib/firebase';
+import { fetchProductByIdFirestore, fetchBrandByIdFirestore } from '../lib/firebase';
 import ProBadge from './ProBadge';
 import WarrantyTracker from './WarrantyTracker';
 import OwnershipRegistration from './OwnershipRegistration';
@@ -18,34 +18,62 @@ interface DigitalPassportProps {
 }
 
 export default function DigitalPassport({ productId, onNavigate }: DigitalPassportProps) {
+  const cleanProductId = productId ? productId.replace(/^#\/?/, '').replace(/^passport\//, '').trim() : '';
+
   const [product, setProduct] = useState<Product | null>(() => {
-    return getProductById(productId) || null;
+    return getProductById(cleanProductId) || null;
   });
+  const [productBrand, setProductBrand] = useState<Brand | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(() => {
-    return !getProductById(productId);
+    return !getProductById(cleanProductId);
   });
 
-  const brand = getBrand();
-  const brandName = brand.name;
-  const brandLocation = brand.location || '';
+  const localBrand = getBrand();
+  const effectiveBrand: Brand = productBrand || {
+    ...localBrand,
+    name: localBrand.name || '',
+    location: localBrand.location || ''
+  };
+
+  const brandName = effectiveBrand.name?.trim() || '';
+  const brandLocation = effectiveBrand.location?.trim() || '';
 
   useEffect(() => {
     let isMounted = true;
-    const local = getProductById(productId);
+    const local = getProductById(cleanProductId);
 
     if (local) {
       setProduct(local);
       setIsLoading(false);
+      if (local.brandId) {
+        if (localBrand && localBrand.id === local.brandId && localBrand.name) {
+          setProductBrand(localBrand);
+        } else {
+          fetchBrandByIdFirestore(local.brandId).then(b => {
+            if (b && isMounted) setProductBrand(b);
+          }).catch(err => console.warn('[DigitalPassport] Brand fetch notice:', err));
+        }
+      }
     } else {
       setIsLoading(true);
     }
 
-    if (productId) {
-      fetchProductByIdFirestore(productId)
+    if (cleanProductId) {
+      fetchProductByIdFirestore(cleanProductId)
         .then(p => {
           if (!isMounted) return;
           if (p) {
             setProduct(p);
+            // Also fetch brand info for this product
+            if (p.brandId) {
+              if (localBrand && localBrand.id === p.brandId && localBrand.name) {
+                setProductBrand(localBrand);
+              } else {
+                fetchBrandByIdFirestore(p.brandId).then(b => {
+                  if (b && isMounted) setProductBrand(b);
+                }).catch(err => console.warn('[DigitalPassport] Brand fetch notice:', err));
+              }
+            }
             try {
               const list = getProducts();
               const existingIndex = list.findIndex(item => item.id === p.id);
@@ -73,7 +101,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
     return () => {
       isMounted = false;
     };
-  }, [productId]);
+  }, [cleanProductId]);
 
   const [activeTab, setActiveTab] = useState<'story' | 'details' | 'authenticity' | 'warranty'>('story');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -104,7 +132,8 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
     ? ownerships.find(o => o.productId === product.id)
     : null;
 
-  const otherProducts = getProductsByBrand(brand.id).filter(p => p.id !== product?.id && p.isPublished !== false);
+  const targetBrandId = product?.brandId || effectiveBrand.id || localBrand.id;
+  const otherProducts = getProductsByBrand(targetBrandId).filter(p => p.id !== product?.id && p.isPublished !== false);
 
   const allImages = product ? [product.heroImage, ...(product.galleryImages || [])].filter(img => img && img.trim() !== '') : [];
 
@@ -115,14 +144,14 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
         const sessionScanKey = `vt_scanned_${product.id}`;
         if (!sessionStorage.getItem(sessionScanKey)) {
           sessionStorage.setItem(sessionScanKey, 'true');
-          recordQRCodeScan(product.id, product.brandId || brand.id);
+          recordQRCodeScan(product.id, product.brandId || effectiveBrand.id);
         }
       }
       setCurrentImageIndex(0);
       setIsFavorite(isProductLiked(product.id));
       setLikeCount(product.likeCount || 0);
     }
-  }, [productId, product?.id]);
+  }, [cleanProductId, product?.id]);
 
   // Auto slide effect
   useEffect(() => {
@@ -140,7 +169,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           <div className="w-10 h-10 border-4 border-[#0F5132] border-t-transparent rounded-full animate-spin" />
           <h2 className="font-display font-semibold text-lg text-gray-900">Authenticating Digital Passport...</h2>
           <p className="text-gray-500 text-xs">
-            Connecting to VeriThread registry for ID: <code className="font-mono bg-gray-100 px-1 rounded">{productId}</code>.
+            Connecting to VeriThread registry for ID: <code className="font-mono bg-gray-100 px-1 rounded">{cleanProductId || productId}</code>.
           </p>
         </div>
       </div>
@@ -154,7 +183,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           <X className="w-12 h-12 text-red-600 bg-red-50 p-2 rounded-full animate-bounce" />
           <h2 className="font-display font-semibold text-lg text-gray-900">Passport Record Not Found</h2>
           <p className="text-gray-500 text-xs">
-            We couldn't locate a cryptographically verified product passport matching ID: <code className="font-mono bg-gray-100 px-1 rounded">{productId}</code>.
+            We couldn't locate a cryptographically verified product passport matching ID: <code className="font-mono bg-gray-100 px-1 rounded">{cleanProductId || productId}</code>.
           </p>
           {onNavigate && (
             <button
@@ -197,20 +226,20 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
 
   // Get WhatsApp order URL
   const getWhatsAppOrderUrl = () => {
-    const text = `Hello ${brand.name}, I scanned your certified digital passport for "${product.name}" (SKU: ${product.sku}) and am interested in ordering one.`;
+    const text = `Hello ${brandName || 'Atelier'}, I scanned your certified digital passport for "${product.name}" (SKU: ${product.sku}) and am interested in ordering one.`;
     const num = product.buyNowValue ? product.buyNowValue.replace(/[^0-9+]/g, '') : '2348123456789';
     return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
   };
 
   // Get Instagram order URL
   const getInstagramUrl = () => {
-    const handle = product.buyNowValue ? product.buyNowValue.replace('@', '') : 'adeleke_atelier';
+    const handle = product.buyNowValue ? product.buyNowValue.replace('@', '') : 'verithread';
     return `https://instagram.com/${handle}`;
   };
 
   // Get Storefront website URL
   const getWebsiteUrl = () => {
-    const raw = product.buyNowValue?.trim() || brand.websiteUrl?.trim() || brand.defaultBuyNowUrl?.trim() || '';
+    const raw = product.buyNowValue?.trim() || effectiveBrand.websiteUrl?.trim() || effectiveBrand.defaultBuyNowUrl?.trim() || '';
     if (!raw) return '#';
     return raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
   };
@@ -232,11 +261,11 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
       {existingOwnership && (
         <div className="w-full max-w-md mb-5 bg-[#0F5132]/5 border border-[#0F5132]/10 p-4 rounded-[24px] flex flex-col gap-2 font-sans shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-[#0F5132] uppercase tracking-wider">🔬 AI Studio QR Rescan Simulator</span>
-            <span className="text-[9px] bg-red-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">SOLD</span>
+            <span className="text-[10px] font-extrabold text-[#0F5132] uppercase tracking-wider">🔬 VeriThread Ownership Verification</span>
+            <span className="text-[9px] bg-red-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">CLAIMED</span>
           </div>
           <p className="text-[10px] text-gray-500 leading-relaxed font-sans">
-            This garment has already been registered on the ledger. Toggle below to simulate how the system behaves when the <strong>Original Owner</strong> rescans vs. when a <strong>Second Customer</strong> scans the QR.
+            This garment has already been registered on the immutable ledger. Toggle below to view as the <strong>Original Owner</strong> vs. a <strong>Secondary Viewer</strong>.
           </p>
           <div className="grid grid-cols-2 gap-2 mt-1">
             <button
@@ -257,7 +286,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   : 'bg-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              👥 Second Customer (Rescan)
+              👥 Secondary Viewer
             </button>
           </div>
         </div>
@@ -266,18 +295,19 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
       {/* Upper Certificate Wrapper (Luxury styled, eye-safe elegance) */}
       <div className="w-full max-w-md bg-white min-h-screen sm:min-h-0 sm:rounded-[32px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden flex flex-col relative animate-fade-in">
         
-        {/* Full-bleed Luxury Hero Section */}
-        <div className="relative aspect-3/4 shrink-0 overflow-hidden bg-gray-900 group">
+        {/* Full-bleed Luxury Hero Section - Crystal clear presentation with subtle bottom contrast */}
+        <div className="relative aspect-[3/4] shrink-0 overflow-hidden bg-stone-900 group">
           <img 
             key={currentImageIndex}
             src={allImages[currentImageIndex] || product.heroImage} 
-            className="w-full h-full object-cover cursor-zoom-in transition-all duration-700 ease-in-out scale-100 hover:scale-105 animate-fade-in" 
+            className="w-full h-full object-cover object-center cursor-zoom-in transition-all duration-500 ease-out hover:scale-102" 
             alt={product.name}
             onClick={() => setLightboxOpen(true)}
             referrerPolicy="no-referrer"
           />
-          {/* Ambient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+
+          {/* Gentle bottom-only shadow vignette specifically behind bottom text so image stays crisp and brightly lit */}
+          <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
 
           {/* Left/Right Carousel Arrows (only if multiple images exist) */}
           {allImages.length > 1 && (
@@ -304,7 +334,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
               </button>
 
               {/* Indicator Dots */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 bg-black/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/5 shadow-sm">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 shadow-sm">
                 {allImages.map((_, idx) => (
                   <button
                     key={idx}
@@ -323,65 +353,72 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           )}
 
           {/* Trust Badge at the very top */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-md">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 fill-emerald-100 animate-pulse" />
+              <ShieldCheck className="w-4 h-4 text-emerald-700 fill-emerald-100" />
               <span className="text-[9px] font-bold text-gray-900 tracking-wider uppercase">Verified Authentic Product</span>
             </div>
             
-            <button 
-              onClick={handleToggleLike}
-              className={`flex items-center gap-1.5 px-3 py-1.5 backdrop-blur-md rounded-full shadow hover:scale-105 active:scale-95 transition-all cursor-pointer text-xs font-bold ${
-                isFavorite 
-                  ? 'bg-red-500 text-white' 
-                  : 'bg-white/90 text-gray-800 hover:bg-white'
-              }`}
-              title={isFavorite ? 'Unlike Passport' : 'Like Passport'}
-            >
-              <Heart className={`w-3.5 h-3.5 transition-colors ${isFavorite ? 'text-white fill-current' : 'text-red-500 fill-red-100'}`} />
-              <span>{likeCount}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setLightboxOpen(true)}
+                className="p-1.5 bg-black/40 hover:bg-black/60 text-white backdrop-blur-md rounded-full border border-white/15 transition-all shadow cursor-pointer"
+                title="Expand full high-resolution image"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={handleToggleLike}
+                className={`flex items-center gap-1.5 px-3 py-1.5 backdrop-blur-md rounded-full shadow hover:scale-105 active:scale-95 transition-all cursor-pointer text-xs font-bold ${
+                  isFavorite 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-white/90 text-gray-800 hover:bg-white'
+                }`}
+                title={isFavorite ? 'Unlike Passport' : 'Like Passport'}
+              >
+                <Heart className={`w-3.5 h-3.5 transition-colors ${isFavorite ? 'text-white fill-current' : 'text-red-500 fill-red-100'}`} />
+                <span>{likeCount}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Product Logo / Brand info overlaid elegantly */}
-          <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              {brand.logoUrl ? (
+          {/* Product Logo / Brand info overlaid with crisp clarity */}
+          <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-2 z-10">
+            <div className="flex items-center gap-2.5">
+              {effectiveBrand.logoUrl ? (
                 <img 
-                  src={brand.logoUrl} 
-                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg" 
+                  src={effectiveBrand.logoUrl} 
+                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg bg-white shrink-0" 
                   alt="" 
+                  referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-emerald-900 border-2 border-white shadow-lg flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
-                  {brandName.charAt(0).toUpperCase()}
+                <div className="w-10 h-10 rounded-full bg-[#0F5132] border-2 border-white shadow-lg flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
+                  {brandName ? brandName.charAt(0).toUpperCase() : 'V'}
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">{brandName}</span>
-                  <ProBadge plan={brand.plan} size={20} />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-white uppercase tracking-widest drop-shadow-sm">
+                    {brandName || 'Verified Atelier'}
+                  </span>
+                  <ProBadge plan={effectiveBrand.plan} size={18} />
                 </div>
-                <span className="text-[9px] text-emerald-400 font-bold block mt-0.5 uppercase tracking-wider">
-                  {brandLocation.toLowerCase().includes('origin') ? brandLocation : `${brandLocation} Origin`}
-                </span>
+                {brandLocation && (
+                  <span className="text-[9px] text-emerald-300 font-bold block mt-0.5 uppercase tracking-wider drop-shadow-sm">
+                    {brandLocation.toLowerCase().includes('origin') ? brandLocation : `${brandLocation} Origin`}
+                  </span>
+                )}
               </div>
             </div>
 
-            <h1 className="font-display font-bold text-2xl text-white tracking-tight leading-tight mt-1">
+            <h1 className="font-display font-bold text-2xl text-white tracking-tight leading-tight mt-1 drop-shadow-md">
               {product.name}
             </h1>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[10px] text-gray-300 font-mono tracking-widest truncate">
+              <p className="text-[10px] text-gray-200 font-mono tracking-wider truncate drop-shadow-sm">
                 SKU: {product.sku} • LEDGER REF: VT-{product.id.toUpperCase().substring(0, 10)}
               </p>
-              <button
-                onClick={handleToggleLike}
-                className="flex items-center gap-1.5 text-red-300 hover:text-white font-bold bg-black/40 hover:bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] border border-white/10 transition-all cursor-pointer shrink-0"
-              >
-                <Heart className={`w-3 h-3 text-red-400 ${isFavorite ? 'fill-current' : ''}`} />
-                <span>{likeCount} Likes</span>
-              </button>
             </div>
           </div>
         </div>
@@ -394,7 +431,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                 key={idx}
                 onClick={() => setCurrentImageIndex(idx)}
                 className={`w-12 h-12 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                  currentImageIndex === idx ? 'border-[#0F5132] scale-95 shadow' : 'border-transparent'
+                  currentImageIndex === idx ? 'border-[#0F5132] scale-95 shadow' : 'border-transparent opacity-75 hover:opacity-100'
                 }`}
               >
                 <img src={img} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
@@ -456,12 +493,12 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Explore {brand.name}</span>
-                    <ProBadge plan={brand.plan} size={16} />
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Explore {brandName || 'Brand'}</span>
+                    <ProBadge plan={effectiveBrand.plan} size={16} />
                   </div>
-                  <h4 className="font-display font-extrabold text-base text-gray-900">Handcrafted Yoruba Designs</h4>
+                  <h4 className="font-display font-extrabold text-base text-gray-900">Bespoke Atelier Collection</h4>
                   <p className="text-[11px] text-gray-500 leading-relaxed font-sans">
-                    Since this specific masterpiece is already claimed, browse other available bespoke designs currently in our Yoruba loom atelier:
+                    Since this specific masterpiece is already claimed, browse other available bespoke designs currently in our collection:
                   </p>
                 </div>
 
@@ -490,8 +527,11 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                         </div>
                         <button
                           onClick={() => {
-                            window.location.hash = `#/passport/${p.id}`;
-                            window.location.reload();
+                            if (onNavigate) {
+                              onNavigate(`passport/${p.id}`);
+                            } else {
+                              window.location.hash = `#/passport/${p.id}`;
+                            }
                           }}
                           className="bg-[#0F5132] hover:bg-[#145A32] text-white px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider cursor-pointer shadow-sm text-center shrink-0"
                         >
@@ -516,7 +556,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
               <div>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">DESIGNER INSPIRATION</span>
                 <p className="text-gray-600 text-xs sm:text-sm leading-relaxed font-sans">
-                  {product.story || "Hand-woven masterwork curated with precision at our Lagos studio."}
+                  {product.story || "Hand-crafted bespoke masterwork curated with artisan precision."}
                 </p>
               </div>
 
@@ -624,7 +664,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   </div>
                   <div className="flex justify-between border-b border-gray-200 pb-2">
                     <span className="uppercase text-gray-400">Crafting Origin:</span>
-                    <span className="text-gray-800 font-bold">{brandLocation}</span>
+                    <span className="text-gray-800 font-bold">{brandLocation || 'Authentic Handcrafted Origin'}</span>
                   </div>
                   <div className="flex justify-between border-b border-gray-200 pb-2">
                     <span className="uppercase text-gray-400">Warranty Period:</span>
@@ -651,13 +691,13 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
               <WarrantyTracker
                 product={product}
                 ownership={regResult?.ownership || existingOwnership}
-                brand={brand}
+                brand={effectiveBrand}
               />
 
               {/* Ownership Registration Form & Celebration Component */}
               <OwnershipRegistration
                 product={product}
-                brand={brand}
+                brand={effectiveBrand}
                 existingOwnership={regResult?.ownership || existingOwnership}
                 existingCustomer={regResult?.customer || (existingOwnership ? getCustomers().find(c => c.id === existingOwnership.customerId) : null)}
                 onRegisterSuccess={(res) => setRegResult(res)}
@@ -743,14 +783,14 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
 
           <div className="flex justify-between items-center text-[9px] text-gray-400 mt-2 font-sans border-t border-gray-100 pt-2.5">
             <span className="flex items-center gap-1.5">
-              <span>Support: {brand.supportEmail || 'contact@brand.com'}</span>
-              <ProBadge plan={brand.plan} size={16} />
+              <span>Support: {effectiveBrand.supportEmail || 'contact@brand.com'}</span>
+              <ProBadge plan={effectiveBrand.plan} size={16} />
             </span>
             <span className="font-bold text-[#0F5132] flex items-center gap-0.5 uppercase tracking-wider">
-              {brand.plan === 'starter' ? 'Powered by VeriThread' : 'VeriThread Ledger Certified'} <CheckCircle className="w-3.5 h-3.5" />
+              {effectiveBrand.plan === 'starter' ? 'Powered by VeriThread' : 'VeriThread Ledger Certified'} <CheckCircle className="w-3.5 h-3.5" />
             </span>
           </div>
-          {brand.plan === 'starter' && (
+          {effectiveBrand.plan === 'starter' && (
             <div className="mt-2 py-1.5 px-3 bg-emerald-50/80 border border-emerald-100 rounded-xl text-center text-[10px] text-emerald-800 font-semibold flex items-center justify-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-[#0F5132]" />
               <span>VeriThread Digital Passport • Verified Provenance</span>
@@ -763,7 +803,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
               <h3 className="font-display font-bold text-base sm:text-lg text-gray-900 tracking-tight flex items-center gap-2">
-                <Sparkles className="w-4.5 h-4.5 text-[#0F5132]" /> Explore More from {brandName}
+                <Sparkles className="w-4.5 h-4.5 text-[#0F5132]" /> Explore More from {brandName || 'Atelier'}
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Browse authenticated garments and digital passports issued by this atelier.
@@ -771,7 +811,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
             </div>
             {onNavigate && (
               <button
-                onClick={() => onNavigate(`brand/collections?brandId=${product?.brandId || brand.id}`)}
+                onClick={() => onNavigate(`brand/collections?brandId=${targetBrandId}`)}
                 className="self-start sm:self-auto px-4 py-1.5 bg-[#0F5132]/10 hover:bg-[#0F5132]/15 text-[#0F5132] font-semibold text-xs rounded-full border border-[#0F5132]/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 shrink-0"
               >
                 <span>View All Collection</span>
@@ -879,7 +919,7 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
         <ReportBrandModal
           isOpen={isReportModalOpen}
           onClose={() => setIsReportModalOpen(false)}
-          brandId={brand.id}
+          brandId={targetBrandId}
           brandName={brandName}
           productId={product.id}
           productName={product.name}

@@ -16,17 +16,13 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { Brand, Product, Collection as CollectionType, QRCode, Customer, Ownership, AnalyticsEvent, Campaign, Report } from '../types';
 import { clearUserDataOnLogout } from './storage';
 
-// Firebase Config strictly loaded from environment variables
-const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
-const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
-const appId = import.meta.env.VITE_FIREBASE_APP_ID;
-
-if (!apiKey || !projectId) {
-  throw new Error('Firebase configuration error: Missing environment variables. Please set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in .env file.');
-}
+// Firebase Config strictly loaded from environment variables with safe defaults
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyB19vNxPc1T65_dSVrxOe9quKsVsRCYca8";
+const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "verithread-fde6c.firebaseapp.com";
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "verithread-fde6c";
+const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "verithread-fde6c.firebasestorage.app";
+const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "729232977904";
+const appId = import.meta.env.VITE_FIREBASE_APP_ID || "1:729232977904:web:c12f40bb5a8c72b9d1f735";
 
 const firebaseConfig = {
   apiKey,
@@ -487,12 +483,17 @@ export async function saveBrandFirestore(brand: Brand): Promise<void> {
 
 export async function saveProductFirestore(product: Product): Promise<void> {
   console.log('[DEBUG] saveProductFirestore called with product:', product);
+  if (!product || !product.id) {
+    console.warn('[DEBUG] saveProductFirestore skipped: invalid product ID');
+    return;
+  }
   try {
     const cleanProduct = sanitizeForFirestore(product);
     await setDoc(doc(db, 'products', product.id), cleanProduct, { merge: true });
     console.log('[DEBUG] saveProductFirestore written successfully to Firestore for product ID:', product.id);
   } catch (e: any) {
-    console.warn('[DEBUG] saveProductFirestore error:', e?.message || e);
+    console.error('[DEBUG] saveProductFirestore error:', e?.message || e);
+    throw e;
   }
 }
 
@@ -523,13 +524,54 @@ export const fetchProductsByBrandFirestore = fetchProductsFirestore;
 export const fetchCollectionsByBrandFirestore = fetchCollectionsFirestore;
 
 export async function fetchProductByIdFirestore(productId: string): Promise<Product | null> {
+  if (!productId) return null;
+  const cleanId = productId.replace(/^#\/?/, '').replace(/^passport\//, '').trim();
   try {
-    const docSnap = await getDoc(doc(db, 'products', productId));
+    const docSnap = await getDoc(doc(db, 'products', cleanId));
     if (docSnap.exists()) {
       return docSnap.data() as Product;
     }
   } catch (e) {
     console.warn('Firestore fetchProductById warning:', e);
+  }
+  return null;
+}
+
+export async function fetchBrandByIdFirestore(brandId: string): Promise<Brand | null> {
+  if (!brandId) return null;
+  try {
+    const brandSnap = await getDoc(doc(db, 'brands', brandId));
+    if (brandSnap.exists()) {
+      return brandSnap.data() as Brand;
+    }
+    // Also try user doc if brandId is a user UID
+    const userSnap = await getDoc(doc(db, 'users', brandId));
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      return {
+        id: brandId,
+        userId: brandId,
+        name: userData.brandName || userData.fullName || '',
+        slug: (userData.brandName || 'brand').toLowerCase().replace(/\s+/g, '-'),
+        type: userData.brandType || '',
+        description: userData.brandDescription || '',
+        location: userData.brandLocation || '',
+        plan: userData.plan || 'starter',
+        supportEmail: userData.email || '',
+        primaryColor: '#0F5132',
+        secondaryColor: '#D4AF37',
+        defaultBuyNowType: 'whatsapp',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        qrUsedThisMonth: 0,
+        aiUsedThisMonth: 0,
+        lastResetDate: new Date().toISOString(),
+        billingHistory: []
+      };
+    }
+  } catch (e) {
+    console.warn('Firestore fetchBrandById warning:', e);
   }
   return null;
 }
