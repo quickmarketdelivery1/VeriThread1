@@ -295,19 +295,48 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
       {/* Upper Certificate Wrapper (Luxury styled, eye-safe elegance) */}
       <div className="w-full max-w-md bg-white min-h-screen sm:min-h-0 sm:rounded-[32px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden flex flex-col relative animate-fade-in">
         
-        {/* Full-bleed Luxury Hero Section - Crystal clear presentation with subtle bottom contrast */}
-        <div className="relative aspect-[3/4] shrink-0 overflow-hidden bg-stone-900 group">
-          <img 
-            key={currentImageIndex}
-            src={allImages[currentImageIndex] || product.heroImage} 
-            className="w-full h-full object-cover object-center cursor-zoom-in transition-all duration-500 ease-out hover:scale-102" 
-            alt={product.name}
-            onClick={() => setLightboxOpen(true)}
-            referrerPolicy="no-referrer"
-          />
+        {/* Crisp, Unobstructed Product Showcase Image */}
+        <div className="relative w-full bg-stone-50 overflow-hidden group border-b border-gray-100">
+          <div className="relative aspect-[4/5] sm:aspect-[1/1] w-full flex items-center justify-center bg-stone-50">
+            <img 
+              key={currentImageIndex}
+              src={allImages[currentImageIndex] || product.heroImage} 
+              className="w-full h-full object-contain sm:object-cover object-center cursor-zoom-in transition-transform duration-300 ease-out hover:scale-105" 
+              alt={product.name}
+              onClick={() => setLightboxOpen(true)}
+              referrerPolicy="no-referrer"
+            />
+          </div>
 
-          {/* Gentle bottom-only shadow vignette specifically behind bottom text so image stays crisp and brightly lit */}
-          <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
+          {/* Top Floating Badges (Frosted Pill Badges in corners - never obscuring product details) */}
+          <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10 pointer-events-none">
+            <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-gray-200/60 pointer-events-auto">
+              <ShieldCheck className="w-4 h-4 text-[#0F5132]" />
+              <span className="text-[10px] font-extrabold text-gray-900 tracking-wider uppercase">Verified Authentic</span>
+            </div>
+            
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                onClick={() => setLightboxOpen(true)}
+                className="p-2 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 backdrop-blur-md rounded-full border border-gray-200/70 transition-all shadow-xs cursor-pointer active:scale-95"
+                title="Expand full high-resolution image"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#0F5132]" />
+              </button>
+              <button 
+                onClick={handleToggleLike}
+                className={`flex items-center gap-1.5 px-3 py-1.5 backdrop-blur-md rounded-full shadow-xs border transition-all cursor-pointer text-xs font-bold active:scale-95 ${
+                  isFavorite 
+                    ? 'bg-red-500 text-white border-red-500' 
+                    : 'bg-white/90 text-gray-800 border-gray-200/70 hover:bg-white'
+                }`}
+                title={isFavorite ? 'Unlike Passport' : 'Like Passport'}
+              >
+                <Heart className={`w-3.5 h-3.5 transition-colors ${isFavorite ? 'text-white fill-current' : 'text-red-500 fill-red-100'}`} />
+                <span>{likeCount}</span>
+              </button>
+            </div>
+          </div>
 
           {/* Left/Right Carousel Arrows (only if multiple images exist) */}
           {allImages.length > 1 && (
@@ -318,9 +347,10 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   e.stopPropagation();
                   setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
                 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center border border-white/10 shadow-sm"
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-md backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center border border-gray-200/80"
+                title="Previous image"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 text-gray-700" />
               </button>
               <button
                 type="button"
@@ -328,13 +358,14 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                   e.stopPropagation();
                   setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center border border-white/10 shadow-sm"
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-md backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center border border-gray-200/80"
+                title="Next image"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 text-gray-700" />
               </button>
 
               {/* Indicator Dots */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 shadow-sm">
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-gray-200/80 shadow-xs">
                 {allImages.map((_, idx) => (
                   <button
                     key={idx}
@@ -344,94 +375,26 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
                       setCurrentImageIndex(idx);
                     }}
                     className={`h-1.5 rounded-full transition-all duration-300 ${
-                      currentImageIndex === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+                      currentImageIndex === idx ? 'w-4 bg-[#0F5132]' : 'w-1.5 bg-gray-300 hover:bg-gray-400'
                     }`}
                   />
                 ))}
               </div>
             </>
           )}
-
-          {/* Trust Badge at the very top */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-md">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 fill-emerald-100" />
-              <span className="text-[9px] font-bold text-gray-900 tracking-wider uppercase">Verified Authentic Product</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setLightboxOpen(true)}
-                className="p-1.5 bg-black/40 hover:bg-black/60 text-white backdrop-blur-md rounded-full border border-white/15 transition-all shadow cursor-pointer"
-                title="Expand full high-resolution image"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={handleToggleLike}
-                className={`flex items-center gap-1.5 px-3 py-1.5 backdrop-blur-md rounded-full shadow hover:scale-105 active:scale-95 transition-all cursor-pointer text-xs font-bold ${
-                  isFavorite 
-                    ? 'bg-red-500 text-white' 
-                    : 'bg-white/90 text-gray-800 hover:bg-white'
-                }`}
-                title={isFavorite ? 'Unlike Passport' : 'Like Passport'}
-              >
-                <Heart className={`w-3.5 h-3.5 transition-colors ${isFavorite ? 'text-white fill-current' : 'text-red-500 fill-red-100'}`} />
-                <span>{likeCount}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Product Logo / Brand info overlaid with crisp clarity */}
-          <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-2 z-10">
-            <div className="flex items-center gap-2.5">
-              {effectiveBrand.logoUrl ? (
-                <img 
-                  src={effectiveBrand.logoUrl} 
-                  className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg bg-white shrink-0" 
-                  alt="" 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-[#0F5132] border-2 border-white shadow-lg flex items-center justify-center font-display font-bold text-white text-sm shrink-0">
-                  {brandName ? brandName.charAt(0).toUpperCase() : 'V'}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-white uppercase tracking-widest drop-shadow-sm">
-                    {brandName || 'Verified Atelier'}
-                  </span>
-                  <ProBadge plan={effectiveBrand.plan} size={18} />
-                </div>
-                {brandLocation && (
-                  <span className="text-[9px] text-emerald-300 font-bold block mt-0.5 uppercase tracking-wider drop-shadow-sm">
-                    {brandLocation.toLowerCase().includes('origin') ? brandLocation : `${brandLocation} Origin`}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <h1 className="font-display font-bold text-2xl text-white tracking-tight leading-tight mt-1 drop-shadow-md">
-              {product.name}
-            </h1>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <p className="text-[10px] text-gray-200 font-mono tracking-wider truncate drop-shadow-sm">
-                SKU: {product.sku} • LEDGER REF: VT-{product.id.toUpperCase().substring(0, 10)}
-              </p>
-            </div>
-          </div>
         </div>
 
-        {/* Thumbnail gallery block */}
+        {/* Thumbnail Gallery Row (clean row beneath main image) */}
         {allImages.length > 1 && (
-          <div className="flex gap-2 p-4 bg-gray-50 border-b border-gray-100 overflow-x-auto shrink-0 justify-center">
+          <div className="flex gap-2.5 px-4 py-3 bg-gray-50/80 border-b border-gray-100 overflow-x-auto shrink-0 justify-center">
             {allImages.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setCurrentImageIndex(idx)}
-                className={`w-12 h-12 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                  currentImageIndex === idx ? 'border-[#0F5132] scale-95 shadow' : 'border-transparent opacity-75 hover:opacity-100'
+                className={`w-14 h-14 rounded-xl overflow-hidden border-2 cursor-pointer transition-all bg-white shrink-0 shadow-xs ${
+                  currentImageIndex === idx 
+                    ? 'border-[#0F5132] ring-2 ring-emerald-500/20 scale-100 shadow-sm' 
+                    : 'border-gray-200 opacity-70 hover:opacity-100 hover:border-gray-300'
                 }`}
               >
                 <img src={img} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
@@ -439,6 +402,72 @@ export default function DigitalPassport({ productId, onNavigate }: DigitalPasspo
             ))}
           </div>
         )}
+
+        {/* Product & Brand Information Header (Dedicated, Bright, Clear Section BELOW Image) */}
+        <div className="p-6 bg-white border-b border-gray-100 flex flex-col gap-4 text-left">
+          {/* Brand Info Bar */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {effectiveBrand.logoUrl ? (
+                <img 
+                  src={effectiveBrand.logoUrl} 
+                  className="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-xs bg-white shrink-0" 
+                  alt={brandName || 'Brand'} 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-full bg-[#0F5132] text-white shadow-xs flex items-center justify-center font-display font-extrabold text-base shrink-0">
+                  {brandName ? brandName.charAt(0).toUpperCase() : 'V'}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wider truncate">
+                    {brandName || 'Verified Atelier'}
+                  </span>
+                  <ProBadge plan={effectiveBrand.plan} size={16} />
+                </div>
+                {brandLocation && (
+                  <span className="text-[10px] text-emerald-800 font-semibold block mt-0.5 uppercase tracking-wide">
+                    {brandLocation.toLowerCase().includes('origin') ? brandLocation : `${brandLocation} Origin`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Passport Certificate Tag */}
+            <div className="shrink-0 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg text-right">
+              <span className="text-[9px] font-extrabold text-[#0F5132] uppercase tracking-wider block">
+                Official Ledger
+              </span>
+              <span className="text-[9px] text-emerald-700 font-mono font-bold block">
+                VT-{product.id.substring(0, 8).toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          {/* Product Name Title */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              {product.category && (
+                <span className="text-[10px] font-extrabold uppercase bg-emerald-50 text-[#0F5132] px-2.5 py-0.5 rounded-md tracking-wider border border-emerald-100">
+                  {product.category}
+                </span>
+              )}
+              {product.priceMin && (
+                <span className="text-xs font-mono font-bold text-gray-900 bg-gray-100 px-2.5 py-0.5 rounded-md">
+                  {product.priceMax ? `₦${Number(product.priceMin).toLocaleString()} - ₦${Number(product.priceMax).toLocaleString()}` : `₦${Number(product.priceMin).toLocaleString()}`}
+                </span>
+              )}
+            </div>
+            <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-gray-900 tracking-tight leading-tight">
+              {product.name}
+            </h1>
+            <p className="text-[11px] text-gray-400 font-mono tracking-wider">
+              SKU: <strong className="text-gray-600">{product.sku}</strong>
+            </p>
+          </div>
+        </div>
 
         {/* Navigation Tabs */}
         {!(existingOwnership && viewerRole === 'guest') && (
